@@ -1,9 +1,10 @@
 import json
 from types import SimpleNamespace
 
+from fastapi.testclient import TestClient
+
 import app.routers.chat_live as chat_live_module
 from app.main import app
-from fastapi.testclient import TestClient
 
 client = TestClient(app)
 
