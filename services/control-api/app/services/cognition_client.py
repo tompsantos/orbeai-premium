@@ -6,7 +6,6 @@ from time import perf_counter
 from typing import Any, Literal
 
 import httpx
-
 from app.core.config import get_settings
 from app.services.providers.mock import estimate_tokens
 from app.services.providers.real import ProviderExecutionResult
