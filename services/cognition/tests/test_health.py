@@ -17,5 +17,8 @@ def test_capabilities_in_development_without_key() -> None:
     response = client.get("/v1/capabilities")
 
     assert response.status_code == 200
-    assert response.json()["hermes_core"] is True
-    assert response.json()["streaming"] is False
+    payload = response.json()
+    assert payload["hermes_core"] is True
+    assert payload["streaming"] is True
+    assert payload["stop"] is True
+    assert payload["approvals"] is True
