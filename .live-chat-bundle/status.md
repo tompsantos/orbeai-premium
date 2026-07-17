@@ -1,1 +1,1 @@
-temporary live-chat materialization marker; remove before merge.
+live-chat recovery verified; temporary marker, remove before merge.
