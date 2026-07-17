@@ -68,9 +68,8 @@ export function VoiceConversationDialog({
 
   const copy = phaseCopy[phase];
   const active = phase === "listening" || phase === "speaking" || phase === "thinking";
-
   const bars = useMemo(
-    () => Array.from({ length: 34 }, (_, index) => 20 + ((index * 17) % 54)),
+    () => Array.from({ length: 24 }, (_, index) => 18 + ((index * 17) % 48)),
     [],
   );
 
@@ -90,19 +89,19 @@ export function VoiceConversationDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden bg-slate-950/70 p-3 backdrop-blur-xl sm:p-6">
-      <div className="relative flex h-full max-h-[860px] w-full max-w-[760px] flex-col overflow-hidden rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top,#22315b_0%,#111827_42%,#090d18_100%)] text-white shadow-2xl">
-        <div className="pointer-events-none absolute -left-32 -top-32 size-80 rounded-full bg-blue-500/20 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-40 -right-20 size-96 rounded-full bg-violet-500/20 blur-3xl" />
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/65 p-4 backdrop-blur-lg">
+      <div className="relative flex h-[min(680px,calc(100dvh-2rem))] w-full max-w-[600px] flex-col overflow-hidden rounded-[1.6rem] border border-white/10 bg-[radial-gradient(circle_at_top,#22315b_0%,#111827_43%,#090d18_100%)] text-white shadow-2xl">
+        <div className="pointer-events-none absolute -left-24 -top-24 size-64 rounded-full bg-blue-500/18 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-32 -right-16 size-72 rounded-full bg-violet-500/18 blur-3xl" />
 
-        <header className="relative flex items-center justify-between px-5 py-5 sm:px-7">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/10">
-              <Sparkles className="size-5 text-blue-300" />
+        <header className="relative flex h-14 shrink-0 items-center justify-between border-b border-white/5 px-5">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/10">
+              <Sparkles className="size-4 text-blue-300" />
             </div>
             <div className="min-w-0">
               <div className="text-sm font-semibold">Conversa por voz</div>
-              <div className="truncate text-xs text-white/55">
+              <div className="truncate text-[11px] text-white/50">
                 {conversationTitle || "Nova conversa com a orbeAI"}
               </div>
             </div>
@@ -110,125 +109,113 @@ export function VoiceConversationDialog({
           <button
             type="button"
             onClick={() => onOpenChange(false)}
-            className="flex size-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 transition hover:bg-white/10 hover:text-white"
+            className="flex size-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/65 transition hover:bg-white/10 hover:text-white"
             aria-label="Fechar conversa por voz"
           >
-            <X className="size-5" />
+            <X className="size-4" />
           </button>
         </header>
 
-        <main className="relative flex flex-1 flex-col items-center justify-center px-5 text-center sm:px-10">
-          <div className="relative flex size-44 items-center justify-center sm:size-56">
+        <main className="relative flex min-h-0 flex-1 flex-col items-center justify-center px-6 text-center">
+          <div className="relative flex size-40 items-center justify-center">
             <div
               className={cn(
-                "absolute inset-0 rounded-full bg-blue-500/20 blur-2xl transition duration-700",
-                active && "scale-110 bg-violet-500/25",
+                "absolute inset-0 rounded-full bg-blue-500/18 blur-2xl transition duration-700",
+                active && "scale-110 bg-violet-500/24",
               )}
             />
             <div
               className={cn(
-                "absolute inset-5 rounded-full border border-white/10 bg-white/[0.04] transition duration-700",
+                "absolute inset-4 rounded-full border border-white/10 bg-white/[0.04] transition duration-700",
                 active && "animate-pulse border-blue-300/25",
               )}
             />
-            <button
-              type="button"
-              onClick={toggleMute}
+            <div
               className={cn(
-                "relative flex size-28 items-center justify-center rounded-full border border-white/15 bg-gradient-to-br from-blue-400 via-blue-600 to-violet-600 shadow-[0_0_80px_rgba(59,130,246,0.45)] transition duration-500 sm:size-36",
+                "relative flex size-24 items-center justify-center rounded-full border border-white/15 bg-gradient-to-br from-blue-400 via-blue-600 to-violet-600 shadow-[0_0_65px_rgba(59,130,246,0.38)] transition duration-500",
                 muted && "from-slate-600 via-slate-700 to-slate-800 shadow-none",
               )}
-              aria-label={muted ? "Retomar microfone" : "Pausar microfone"}
             >
-              {muted ? <MicOff className="size-10" /> : <Mic className="size-11 sm:size-12" />}
-            </button>
-          </div>
-
-          <div className="mt-8">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5 text-xs text-white/70">
-              <Radio className={cn("size-3.5", active && "text-emerald-300")} />
-              {phase === "connecting" ? "Conectando" : "Sessão ao vivo"}
+              {muted ? <MicOff className="size-8" /> : <Mic className="size-9" />}
             </div>
-            <h2 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">{copy.title}</h2>
-            <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-white/60 sm:text-base">
-              {copy.description}
-            </p>
           </div>
 
-          <div className="mt-9 flex h-12 items-center justify-center gap-1.5" aria-hidden="true">
+          <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-[11px] text-white/65">
+            <Radio className={cn("size-3", active && "text-emerald-300")} />
+            {phase === "connecting" ? "Conectando" : "Sessão ao vivo"}
+          </div>
+
+          <h2 className="mt-3 text-2xl font-semibold tracking-tight">{copy.title}</h2>
+          <p className="mx-auto mt-2 max-w-sm text-sm leading-5 text-white/55">{copy.description}</p>
+
+          <div className="mt-5 flex h-8 items-center justify-center gap-1" aria-hidden="true">
             {bars.map((height, index) => (
               <span
                 key={index}
                 className={cn(
-                  "w-1 rounded-full bg-gradient-to-t from-blue-500 to-violet-300 transition-all duration-300",
+                  "w-0.5 rounded-full bg-gradient-to-t from-blue-500 to-violet-300 transition-all duration-300",
                   active ? "opacity-90" : "opacity-25",
                 )}
-                style={{
-                  height: `${active ? height : 18}%`,
-                  animationDelay: `${index * 35}ms`,
-                }}
+                style={{ height: `${active ? height : 16}%`, animationDelay: `${index * 35}ms` }}
               />
             ))}
           </div>
 
           {captionsEnabled && (
-            <div className="mt-8 min-h-16 w-full max-w-xl rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-4 text-sm text-white/65">
-              {transcript || "A transcrição em tempo real aparecerá aqui quando o serviço de voz for conectado."}
+            <div className="mt-5 min-h-12 w-full max-w-md rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-xs leading-5 text-white/55">
+              {transcript || "A transcrição aparecerá aqui quando o serviço de voz for conectado."}
             </div>
           )}
         </main>
 
-        <footer className="relative px-5 pb-6 pt-4 sm:px-8 sm:pb-8">
-          <div className="flex items-center justify-center gap-3">
+        <footer className="relative shrink-0 border-t border-white/5 px-5 py-4">
+          <div className="flex items-center justify-center gap-2.5">
             <button
               type="button"
               onClick={toggleMute}
               className={cn(
-                "flex size-12 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white/80 transition hover:bg-white/15 hover:text-white",
+                "flex size-10 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white/80 transition hover:bg-white/15 hover:text-white",
                 muted && "bg-white text-slate-950 hover:bg-white/90",
               )}
               aria-label={muted ? "Ativar microfone" : "Silenciar microfone"}
             >
-              {muted ? <MicOff className="size-5" /> : <Mic className="size-5" />}
+              {muted ? <MicOff className="size-4" /> : <Mic className="size-4" />}
             </button>
             <button
               type="button"
               onClick={() => setCaptionsEnabled((current) => !current)}
               className={cn(
-                "flex size-12 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white/80 transition hover:bg-white/15 hover:text-white",
+                "flex size-10 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white/80 transition hover:bg-white/15 hover:text-white",
                 captionsEnabled && "bg-white text-slate-950 hover:bg-white/90",
               )}
               aria-label="Alternar transcrição"
             >
-              <Headphones className="size-5" />
+              <Headphones className="size-4" />
             </button>
             <button
               type="button"
               onClick={() => setPhase((current) => (current === "speaking" ? "listening" : "speaking"))}
-              className="flex size-12 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white/80 transition hover:bg-white/15 hover:text-white"
+              className="flex size-10 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white/80 transition hover:bg-white/15 hover:text-white"
               aria-label="Alternar saída de voz"
             >
-              <Volume2 className="size-5" />
+              <Volume2 className="size-4" />
             </button>
             <button
               type="button"
-              className="flex size-12 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white/80 transition hover:bg-white/15 hover:text-white"
+              className="flex size-10 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white/80 transition hover:bg-white/15 hover:text-white"
               aria-label="Configurações de voz"
             >
-              <Settings2 className="size-5" />
+              <Settings2 className="size-4" />
             </button>
             <button
               type="button"
               onClick={closeVoice}
-              className="ml-2 flex size-14 items-center justify-center rounded-full bg-red-500 text-white shadow-lg transition hover:bg-red-400"
+              className="ml-1 flex size-11 items-center justify-center rounded-full bg-red-500 text-white shadow-lg transition hover:bg-red-400"
               aria-label="Encerrar conversa por voz"
             >
-              <PhoneOff className="size-6" />
+              <PhoneOff className="size-5" />
             </button>
           </div>
-          <p className="mt-4 text-center text-[11px] text-white/35">
-            Interface pronta para streaming de áudio, detecção de fala, transcrição e resposta em tempo real.
-          </p>
         </footer>
       </div>
     </div>
