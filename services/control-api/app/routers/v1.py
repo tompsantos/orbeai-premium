@@ -1,3 +1,5 @@
+from fastapi import APIRouter, Depends
+
 from app.dependencies.auth import get_current_auth_context
 from app.routers import (
     artifacts,
@@ -15,7 +17,6 @@ from app.routers import (
     projects,
     workspace,
 )
-from fastapi import APIRouter, Depends
 
 router = APIRouter(prefix="/v1")
 
