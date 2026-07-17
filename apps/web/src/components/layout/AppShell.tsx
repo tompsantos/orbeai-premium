@@ -21,6 +21,10 @@ import { logout } from "@/lib/auth/authService";
 import { getAuthToken, getStoredAuthUser } from "@/lib/auth/session";
 import { cn } from "@/lib/utils";
 
+const rawEnv =
+  ((import.meta as unknown as { env?: Record<string, string | boolean | undefined> }).env ?? {});
+const mockMode = (rawEnv.VITE_MOCK_MODE ?? "true") !== "false";
+
 export function AppShell() {
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
@@ -28,7 +32,7 @@ export function AppShell() {
   const [authUser, setAuthUser] = useState(() => getStoredAuthUser());
 
   useEffect(() => {
-    if (!getAuthToken()) {
+    if (!mockMode && !getAuthToken()) {
       void navigate({ to: "/login" });
       return;
     }

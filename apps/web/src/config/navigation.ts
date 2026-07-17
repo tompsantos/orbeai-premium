@@ -1,5 +1,6 @@
 import {
   Bot,
+  BookOpen,
   Brain,
   Building2,
   FlaskConical,
@@ -33,7 +34,7 @@ export const MAIN_NAV: NavigationItem[] = [
   { id: "chat", label: "Chat", to: "/app/chat", icon: MessageSquare, mobile: true },
   { id: "projects", label: "Projetos", to: "/app/projects", icon: FolderKanban, mobile: true },
   { id: "memory", label: "Memória", to: "/app/memory", icon: Brain, mobile: true },
-  { id: "knowledge", label: "Conhecimento", to: "/app/research", icon: Library },
+  { id: "knowledge", label: "Conhecimento", to: "/app/research", icon: BookOpen },
   { id: "library", label: "Biblioteca", to: "/app/artifacts", icon: Library },
   { id: "teams", label: "Equipes", to: "/app/agents", icon: Users },
   { id: "workspaces", label: "Workspaces", to: "/app/orbeone", icon: Building2 },
