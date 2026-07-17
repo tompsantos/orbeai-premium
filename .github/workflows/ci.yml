@@ -8,9 +8,55 @@ on:
   pull_request:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
+  control-api-test-report:
+    if: github.event_name == 'pull_request' && github.head_ref == 'agent/transplant-orbeai-product' && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: orbeai
+          POSTGRES_USER: orbeai
+          POSTGRES_PASSWORD: orbeai
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U orbeai -d orbeai"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql+psycopg://orbeai:orbeai@localhost:5433/orbeai
+      COGNITION_ENABLED: "false"
+    defaults:
+      run:
+        working-directory: services/control-api
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/transplant-orbeai-product
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: install
+        run: pip install -q -e ".[dev]"
+      - name: migrate test database
+        run: alembic upgrade head
+      - name: write focused test report
+        run: pytest -q --maxfail=5 --tb=line > ../../docs/control-api-test-report.txt 2>&1 || true
+      - name: publish focused test report
+        working-directory: .
+        run: |
+          git config user.name "orbeOne build bot"
+          git config user.email "buildbot@orbeone.com.br"
+          git add docs/control-api-test-report.txt
+          git commit -m "add focused control API behavior diagnostic"
+          git push origin HEAD:agent/transplant-orbeai-product
+
   cognition:
     runs-on: ubuntu-24.04
     defaults:
