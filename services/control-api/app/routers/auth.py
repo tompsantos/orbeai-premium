@@ -18,7 +18,6 @@ from app.services.auth import (
     revoke_auth_session,
 )
 
-
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 

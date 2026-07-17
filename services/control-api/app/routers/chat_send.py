@@ -10,13 +10,13 @@ from app.models import Chat, Message, ModelRun, Project, Workspace
 from app.models.core import utc_now
 from app.schemas.chat_send import ChatSendRequest, ChatSendResponse, MemoryEventRead
 from app.services.audit import write_audit_log
-from app.services.chat_runtime import execute_chat_runtime
 from app.services.auto_memory import maybe_create_auto_memory
+from app.services.chat_runtime import execute_chat_runtime
 from app.services.feature_flags import is_feature_enabled
 from app.services.memory_context import build_memory_context, select_relevant_memories
 from app.services.orbe_router import resolve_chat_route
-from app.services.workspace_settings import get_or_create_workspace_settings
 from app.services.workspace_policies import get_workspace_policy, memory_context_limit
+from app.services.workspace_settings import get_or_create_workspace_settings
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 

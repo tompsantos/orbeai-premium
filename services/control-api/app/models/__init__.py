@@ -3,8 +3,8 @@
 from app.models.core import (
     Artifact,
     ArtifactVersion,
-    AuthSession,
     AuditLog,
+    AuthSession,
     Chat,
     FeatureFlag,
     IntegrationClient,

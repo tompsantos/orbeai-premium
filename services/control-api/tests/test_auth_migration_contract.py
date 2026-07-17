@@ -1,6 +1,5 @@
 from pathlib import Path
 
-
 MIGRATION = Path("alembic/versions/20260627_0004_auth_foundation.py")
 
 

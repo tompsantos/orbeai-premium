@@ -3,7 +3,6 @@ import hashlib
 import hmac
 import secrets
 
-
 PASSWORD_ALGORITHM = "pbkdf2_sha256"
 PASSWORD_ITERATIONS = 390_000
 PASSWORD_SALT_BYTES = 16

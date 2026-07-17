@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -13,7 +13,6 @@ from app.core.security import (
 from app.models import AuthSession, User, Workspace, WorkspaceMember
 from app.services.bootstrap import get_or_create_default_workspace
 
-
 SESSION_TTL_DAYS = 30
 
 
@@ -26,7 +25,7 @@ class DuplicateEmailError(AuthServiceError):
 
 
 def utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def find_user_by_email(db: Session, email: str) -> User | None:

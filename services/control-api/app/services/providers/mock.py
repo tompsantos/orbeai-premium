@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 
-
 MOCK_PROVIDER_NAME = "orbe-mock"
 MOCK_MODEL_NAME = "orbe-mock-v0"
 

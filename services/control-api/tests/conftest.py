@@ -1,7 +1,6 @@
 from collections.abc import Generator
 from datetime import timedelta
 
-
 import pytest
 from sqlalchemy import select
 
@@ -13,7 +12,6 @@ from app.models import AuthSession, FeatureFlag, User, WorkspaceMember
 from app.services.bootstrap import get_or_create_default_workspace
 from app.services.feature_flags import ensure_default_flags
 from app.services.workspace_settings import get_or_create_workspace_settings
-
 
 DEFAULT_FLAG_STATE = {
     "real_providers": True,
@@ -79,7 +77,7 @@ def should_use_real_auth(node: object) -> bool:
 
 
 def fake_auth_context() -> AuthContext:
-    now = utc_now = __import__("app.models.core", fromlist=["utc_now"]).utc_now()
+    now = __import__("app.models.core", fromlist=["utc_now"]).utc_now()
 
     user = User(
         id="usr_pytest_auth",

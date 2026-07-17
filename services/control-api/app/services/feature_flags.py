@@ -3,7 +3,6 @@ from sqlalchemy.orm import Session
 
 from app.models import FeatureFlag
 
-
 DEFAULT_FLAGS = [
     {
         "key": "real_providers",

@@ -7,7 +7,6 @@ from app.db.session import SessionLocal
 from app.main import app
 from app.models import Message, Project, Workspace
 
-
 client = TestClient(app)
 
 
