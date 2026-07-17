@@ -46,7 +46,11 @@ from app.services.providers.real import (
     execute_provider,
     run_mock_provider,
 )
-from app.services.workspace_policies import WorkspacePolicy, get_workspace_policy, memory_context_limit
+from app.services.workspace_policies import (
+    WorkspacePolicy,
+    get_workspace_policy,
+    memory_context_limit,
+)
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
