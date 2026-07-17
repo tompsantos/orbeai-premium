@@ -1,33 +1,82 @@
 name: ci
 
 on:
-  pull_request:
   push:
     branches:
       - main
+      - agent/**
+  pull_request:
 
 permissions:
   contents: read
 
 jobs:
   cognition:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: services/cognition
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: pip
-
       - name: install
-        run: pip install -e ".[dev]"
-
+        run: pip install -q -e ".[dev]"
       - name: lint
-        run: ruff check app tests
-
+        run: ruff check app tests --output-format=concise
       - name: tests
         run: pytest -q
+
+  control-api:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: orbeai
+          POSTGRES_USER: orbeai
+          POSTGRES_PASSWORD: orbeai
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U orbeai -d orbeai"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql+psycopg://orbeai:orbeai@localhost:5433/orbeai
+      COGNITION_ENABLED: "false"
+    defaults:
+      run:
+        working-directory: services/control-api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: install
+        run: pip install -q -e ".[dev]"
+      - name: migrate test database
+        run: alembic upgrade head
+      - name: lint
+        run: ruff check app tests --output-format=concise
+      - name: tests
+        run: pytest -q
+
+  web:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: install
+        run: npm install --silent
+      - name: typecheck
+        run: npm run typecheck
+      - name: build
+        run: npm run build

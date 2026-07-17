@@ -60,3 +60,14 @@ A incorporação do frontend e do backend atuais será feita preservando o produ
 - commit inicial fixado do Hermes: `36bf3c2673e39a7b237b04c5a637ff29e1278e66`
 
 O Hermes Agent é licenciado sob MIT. Os avisos legais e de copyright serão preservados nas distribuições derivadas.
+
+## produto transplantado
+
+A interface e o backend funcional da orbeAI original agora vivem em:
+
+- `apps/web`
+- `services/control-api`
+
+O endpoint de chat do control API opera em modo cognition-first e chama
+`services/cognition`, mantendo fallback legado temporário para uma migração
+segura e observável.
