@@ -19,8 +19,8 @@ dependencies = [
   "passlib[bcrypt]>=1.7.4",
   "structlog>=24.1.0",
   "httpx>=0.27.0",
-    "openai>=2.0.0",
-    "google-genai>=1.0.0",
+  "openai>=2.0.0",
+  "google-genai>=1.0.0",
 ]
 
 [project.optional-dependencies]
@@ -40,6 +40,10 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+ignore = [
+  "B008", # FastAPI usa Depends(...) em parâmetros de rota por design.
+  "E501", # O backend legado possui linhas longas; formatação será tratada gradualmente.
+]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
