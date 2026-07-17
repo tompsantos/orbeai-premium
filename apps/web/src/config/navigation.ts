@@ -1,5 +1,4 @@
 import {
-  Bot,
   BookOpen,
   Brain,
   Building2,
@@ -37,7 +36,7 @@ export const MAIN_NAV: NavigationItem[] = [
   { id: "knowledge", label: "Conhecimento", to: "/app/research", icon: BookOpen },
   { id: "library", label: "Biblioteca", to: "/app/artifacts", icon: Library },
   { id: "teams", label: "Equipes", to: "/app/agents", icon: Users },
-  { id: "workspaces", label: "Workspaces", to: "/app/orbeone", icon: Building2 },
+  { id: "workspaces", label: "Espaços", to: "/app/orbeone", icon: Building2 },
 ];
 
 export const LAB_NAV: NavigationItem[] = [
