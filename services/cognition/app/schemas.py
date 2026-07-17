@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -18,9 +18,11 @@ class TurnRequest(BaseModel):
     enabled_toolsets: list[str] | None = None
     disabled_toolsets: list[str] | None = None
 
-    @field_validator("workspace_id", "user_id", "chat_id")
+    @field_validator("workspace_id", "user_id", "chat_id", "request_id")
     @classmethod
-    def reject_control_characters(cls, value: str) -> str:
+    def reject_control_characters(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
         if any(ord(char) < 32 for char in value):
             raise ValueError("identificador contém caractere de controle")
         return value.strip()
@@ -33,7 +35,17 @@ class TurnResponse(BaseModel):
     final_response: str
     messages: list[dict[str, Any]]
     runtime: str = "orbe-cognition"
-    runtime_version: str = "0.1.0"
+    runtime_version: str = "0.2.0"
+
+
+class ApprovalRequest(BaseModel):
+    choice: Literal["once", "session", "deny"]
+
+
+class RunActionResponse(BaseModel):
+    request_id: str
+    accepted: bool
+    resolved: int = 0
 
 
 class CapabilitiesResponse(BaseModel):
@@ -41,6 +53,8 @@ class CapabilitiesResponse(BaseModel):
     hermes_core: bool
     synchronous_turns: bool
     streaming: bool
+    stop: bool
+    approvals: bool
     scoped_builtin_memory: bool
     external_memory_context: bool
     tool_policy: bool
