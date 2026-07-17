@@ -7,9 +7,53 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
+  transplant:
+    if: github.event_name == 'pull_request' && github.head_ref == 'agent/transplant-orbeai-product' && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: checkout premium branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/transplant-orbeai-product
+          fetch-depth: 0
+
+      - name: checkout original orbeAI
+        uses: actions/checkout@v4
+        with:
+          repository: tompsantos/orbeai
+          ref: main
+          path: .transplant/orbeai-source
+
+      - name: capture source revision
+        run: echo "ORBEAI_SOURCE_SHA=$(git -C .transplant/orbeai-source rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: transplant frontend and control API
+        env:
+          ORBEAI_SOURCE_DIR: ${{ github.workspace }}/.transplant/orbeai-source
+        run: python scripts/transplant_orbeai.py
+
+      - name: validate generated python syntax
+        run: python -m compileall -q services/control-api/app services/cognition/app
+
+      - name: remove one-time scaffolding
+        run: |
+          rm -rf .transplant
+          rm -f scripts/transplant_orbeai.py
+          rm -f .github/workflows/transplant-orbeai-product.yml
+          rmdir scripts 2>/dev/null || true
+
+      - name: commit transplanted product
+        run: |
+          git config user.name "orbeOne build bot"
+          git config user.email "buildbot@orbeone.com.br"
+          git add -A
+          git commit -m "transplant orbeAI frontend and control API"
+          git push origin HEAD:agent/transplant-orbeai-product
+
   cognition:
     runs-on: ubuntu-latest
     defaults:
