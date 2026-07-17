@@ -1,0 +1,42 @@
+name: assemble official project pdf
+
+on:
+  push:
+    branches:
+      - docs/institutionalize-project-docs
+    paths:
+      - .github/workflows/assemble-project-pdf.yml
+
+permissions:
+  contents: write
+
+jobs:
+  assemble:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: docs/institutionalize-project-docs
+
+      - name: download, decrypt and verify exact pdf
+        run: |
+          set -euo pipefail
+          mkdir -p docs
+          curl --fail --show-error --silent --location \
+            'https://orbeai-docs-7f2c9b6e.serveo.net/b7a9f2c13d6e4a808d5f0e91c4b27a6f.bin' \
+            --output /tmp/projeto-orbeai-premium.pdf.enc
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 \
+            -in /tmp/projeto-orbeai-premium.pdf.enc \
+            -out docs/projeto-orbeai-premium.pdf \
+            -pass pass:'orbeai-2b6f9d4e-3c87-4a70-9b5d-1f8e6c2a7d49-2026'
+          echo '52ed3af2e904b677eddd0f4ef49af24ec2cd37684c04aae4ca193b2637d790d7  docs/projeto-orbeai-premium.pdf' | sha256sum -c -
+
+      - name: commit official pdf
+        run: |
+          set -euo pipefail
+          git config user.name 'orbeAI engineering bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add docs/projeto-orbeai-premium.pdf
+          git commit -m 'docs: add official project constitution PDF'
+          git push origin HEAD:docs/institutionalize-project-docs
