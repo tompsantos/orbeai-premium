@@ -1,0 +1,30 @@
+services:
+  orbeai-cognition:
+    build:
+      context: ./services/cognition
+    container_name: orbeai-cognition
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      HERMES_HOME: /var/lib/orbe-cognition/hermes
+    ports:
+      - "127.0.0.1:8081:8081"
+    volumes:
+      - orbeai_cognition_runtime:/var/lib/orbe-cognition
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8081/health', timeout=5)"]
+      interval: 20s
+      timeout: 6s
+      retries: 5
+      start_period: 30s
+    networks:
+      - orbeai-internal
+
+networks:
+  orbeai-internal:
+    name: orbeai-internal
+    internal: true
+
+volumes:
+  orbeai_cognition_runtime:

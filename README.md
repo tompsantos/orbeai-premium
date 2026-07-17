@@ -2,15 +2,17 @@
 
 A distribuição cognitiva premium da orbeOne.
 
-Este repositório nasce para unir o produto já funcional da `tompsantos/orbeai` ao runtime agêntico do `NousResearch/hermes-agent`, preservando a experiência, autenticação, governança e arquitetura multiusuário da orbeAI enquanto o Hermes fornece o núcleo de execução, ferramentas, contexto, sessões, skills e evolução procedural.
+Este repositório une o produto funcional de `tompsantos/orbeai` ao runtime agêntico do `NousResearch/hermes-agent`, preservando a experiência, autenticação, governança e arquitetura multiusuário da orbeAI enquanto o Hermes fornece o núcleo de execução, ferramentas, contexto, sessões, skills e evolução procedural.
 
-## visão
+## arquitetura
 
 ```text
+internet
+   ↓
 orbeAI web
    ↓
 orbeAI control API
-   ↓
+   ↓ rede interna
 orbe cognition core
    ↓
 modelos · memória · skills · ferramentas · subagentes
@@ -22,17 +24,39 @@ modelos · memória · skills · ferramentas · subagentes
 - banco PostgreSQL: `orbeone-db-01`
 - deploy: containers Docker isolados
 - persistência oficial: PostgreSQL da orbeOne
-- runtime cognitivo: serviço interno não exposto diretamente à internet
+- runtime cognitivo: serviço interno, sem exposição pública direta
 
-## estado
+## estrutura planejada
 
-🚧 fundação inicial em construção.
+```text
+apps/web                  interface premium da orbeAI
+services/control-api      auth, workspaces, políticas, auditoria e persistência
+services/cognition        runtime cognitivo derivado do Hermes
+packages/contracts        contratos compartilhados
+infra                     compose, nginx e implantação
+docs                      arquitetura e decisões
+```
 
-A primeira entrega cria o monorepo, o serviço `orbe-cognition`, contratos internos, segurança básica e documentação da implantação futura.
+## estado atual
+
+A fundação inicial entrega:
+
+- monorepo e contratos arquiteturais;
+- primeiro serviço `orbe-cognition`;
+- import direto e fixado do `AIAgent`;
+- isolamento por `workspace_id`, `user_id` e `chat_id`;
+- identidade nativa da orbeAI;
+- chave interna entre serviços;
+- restrição inicial de ferramentas;
+- healthcheck, capabilities e testes;
+- preparação para a infraestrutura Locaweb.
+
+A incorporação do frontend e do backend atuais será feita preservando o produto, sem reescrever tudo do zero.
 
 ## upstreams
 
 - produto-base: `tompsantos/orbeai`
 - runtime-base: `NousResearch/hermes-agent`
+- commit inicial fixado do Hermes: `36bf3c2673e39a7b237b04c5a637ff29e1278e66`
 
-O Hermes Agent é licenciado sob MIT. Os avisos legais serão preservados nas distribuições derivadas.
+O Hermes Agent é licenciado sob MIT. Os avisos legais e de copyright serão preservados nas distribuições derivadas.
