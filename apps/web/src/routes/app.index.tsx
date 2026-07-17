@@ -4,26 +4,76 @@ import {
   ArrowRight,
   BookOpen,
   Brain,
-  Clock3,
+  FileSearch,
   FolderKanban,
+  GraduationCap,
+  ImagePlus,
   Library,
   MessageSquare,
-  Plus,
+  Mic,
+  Paperclip,
+  Search,
   Sparkles,
+  WandSparkles,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
-import { GlassCard, IconBadge, Pill, SectionHeader } from "@/components/design-system/Primitives";
 import { Button } from "@/components/ui/button";
 import { artifactService, chatService, memoryService, projectService } from "@/lib/api";
 import { getStoredAuthUser } from "@/lib/auth/session";
 import type { Artifact, Chat, MemoryItem, Project } from "@/types";
 
 export const Route = createFileRoute("/app/")({
-  head: () => ({ meta: [{ title: "Dashboard · orbeAI" }] }),
+  head: () => ({ meta: [{ title: "Início · orbeAI" }] }),
   component: Dashboard,
 });
+
+type ExploreItem = {
+  title: string;
+  description: string;
+  icon: typeof MessageSquare;
+  to: "/app/chat" | "/app/research" | "/app/artifacts" | "/app/projects" | "/app/memory";
+};
+
+const exploreItems: ExploreItem[] = [
+  {
+    title: "Conversar",
+    description: "Pergunte, pense em voz alta ou simplesmente troque uma ideia.",
+    icon: MessageSquare,
+    to: "/app/chat",
+  },
+  {
+    title: "Pesquisar",
+    description: "Explore um assunto com mais profundidade e contexto.",
+    icon: Search,
+    to: "/app/research",
+  },
+  {
+    title: "Analisar um arquivo",
+    description: "Envie um documento, imagem ou material para entender melhor.",
+    icon: FileSearch,
+    to: "/app/chat",
+  },
+  {
+    title: "Criar alguma coisa",
+    description: "Transforme uma ideia em texto, plano, imagem ou artifact.",
+    icon: WandSparkles,
+    to: "/app/artifacts",
+  },
+  {
+    title: "Aprender",
+    description: "Estude no seu ritmo, com explicações feitas para você.",
+    icon: GraduationCap,
+    to: "/app/chat",
+  },
+  {
+    title: "Organizar uma ideia",
+    description: "Dê forma a planos pessoais, estudos ou projetos de trabalho.",
+    icon: FolderKanban,
+    to: "/app/projects",
+  },
+];
 
 function Dashboard() {
   const [chats, setChats] = useState<Chat[]>([]);
@@ -58,196 +108,198 @@ function Dashboard() {
   }, []);
 
   const latestChat = chats[0];
-  const activeProjects = projects.filter((project) => project.status === "ativo").length;
+  const latestProject = projects[0];
+  const latestArtifact = artifacts[0];
 
   return (
-    <div className="space-y-8">
-      <section className="relative overflow-hidden rounded-3xl border border-border/70 bg-card px-6 py-7 md:px-9 md:py-9">
+    <div className="mx-auto w-full max-w-7xl space-y-10 pb-10">
+      <section className="relative overflow-hidden rounded-[2rem] border border-border/70 bg-card px-5 py-8 shadow-sm sm:px-8 md:px-12 md:py-12">
         <div
-          className="pointer-events-none absolute -right-24 -top-32 size-80 rounded-full opacity-25"
+          className="pointer-events-none absolute -right-24 -top-32 size-96 rounded-full opacity-30"
           style={{ background: "radial-gradient(circle, var(--orbe-blue), transparent 64%)" }}
         />
-        <div className="relative max-w-3xl">
-          <Pill tone="blue">seu espaço de trabalho</Pill>
-          <h1 className="mt-4 text-3xl font-semibold tracking-tight md:text-5xl">
-            {greeting}, {firstName}.
-          </h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground md:text-base">
-            A orbeAI reuniu o que está em movimento para você retomar o contexto sem vasculhar a plataforma inteira.
-          </p>
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Button asChild>
-              <Link to="/app/chat">
-                <MessageSquare className="mr-1 size-4" /> conversar com a orbeAI
-              </Link>
-            </Button>
-            <Button variant="outline" asChild>
-              <Link to="/app/projects">
-                <Plus className="mr-1 size-4" /> novo projeto
-              </Link>
-            </Button>
+        <div
+          className="pointer-events-none absolute -bottom-40 left-1/3 size-80 rounded-full opacity-15"
+          style={{ background: "radial-gradient(circle, var(--orbe-cyan), transparent 66%)" }}
+        />
+
+        <div className="relative mx-auto max-w-4xl text-center">
+          <div className="mx-auto mb-5 flex size-12 items-center justify-center rounded-2xl border border-[color-mix(in_oklch,var(--orbe-blue)_25%,transparent)] bg-[color-mix(in_oklch,var(--orbe-blue)_10%,transparent)]">
+            <Sparkles className="size-5 text-[var(--orbe-blue)]" />
           </div>
-        </div>
-      </section>
 
-      <section>
-        <SectionHeader eyebrow="visão do dia" title="O que merece sua atenção" />
-        <div className="grid gap-3 md:grid-cols-3">
-          <OverviewCard
-            icon={FolderKanban}
-            value={String(activeProjects)}
-            label="projetos ativos"
-            description="frentes abertas no seu workspace"
-            to="/app/projects"
-          />
-          <OverviewCard
-            icon={Brain}
-            value={String(memories.length)}
-            label="memórias pendentes"
-            description="itens aguardando sua curadoria"
-            to="/app/memory"
-          />
-          <OverviewCard
-            icon={Library}
-            value={String(artifacts.length)}
-            label="itens na biblioteca"
-            description="conteúdos e entregáveis criados"
-            to="/app/artifacts"
-          />
-        </div>
-      </section>
+          <h1 className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl md:text-5xl">
+            {greeting}, {firstName}. No que vamos mergulhar hoje?
+          </h1>
+          <p className="mx-auto mt-4 max-w-2xl text-pretty text-sm leading-6 text-muted-foreground sm:text-base">
+            Converse, crie, pesquise, estude ou organize qualquer parte da sua vida. A orbeAI se adapta ao seu contexto, não o contrário.
+          </p>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <section className="lg:col-span-2">
-          <SectionHeader
-            eyebrow="continue de onde parou"
-            title="Projetos recentes"
-            action={
-              <Button variant="ghost" size="sm" asChild>
-                <Link to="/app/projects">ver todos <ArrowRight className="ml-1 size-3.5" /></Link>
+          <Link
+            to="/app/chat"
+            className="group mx-auto mt-8 flex min-h-16 w-full max-w-3xl items-center gap-3 rounded-2xl border border-border/80 bg-background/90 px-4 py-3 text-left shadow-sm transition hover:border-[color-mix(in_oklch,var(--orbe-blue)_35%,var(--border))] hover:shadow-md sm:px-5"
+          >
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[color-mix(in_oklch,var(--orbe-blue)_10%,transparent)]">
+              <MessageSquare className="size-5 text-[var(--orbe-blue)]" />
+            </div>
+            <span className="min-w-0 flex-1 text-sm text-muted-foreground sm:text-base">
+              Escreva uma pergunta, ideia ou assunto...
+            </span>
+            <div className="hidden items-center gap-1.5 text-muted-foreground sm:flex">
+              <Paperclip className="size-4" />
+              <Mic className="size-4" />
+              <ImagePlus className="size-4" />
+            </div>
+            <ArrowRight className="size-5 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-[var(--orbe-blue)]" />
+          </Link>
+
+          <div className="mt-4 flex flex-wrap justify-center gap-2">
+            {["me ajuda a pensar", "explica isso pra mim", "vamos criar algo", "quero pesquisar um tema"].map((label) => (
+              <Button key={label} variant="outline" size="sm" asChild className="rounded-full bg-background/65">
+                <Link to="/app/chat">{label}</Link>
               </Button>
-            }
-          />
-          <div className="grid gap-3 sm:grid-cols-2">
-            {projects.slice(0, 4).map((project) => (
-              <Link
-                key={project.id}
-                to="/app/projects/$id"
-                params={{ id: project.id }}
-                className="group orbe-card orbe-card-hover block p-5"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <IconBadge icon={FolderKanban} size="sm" />
-                  <ArrowRight className="size-4 text-muted-foreground/30 transition-transform group-hover:translate-x-1 group-hover:text-muted-foreground" />
-                </div>
-                <h3 className="mt-4 font-medium">{project.name}</h3>
-                <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{project.description}</p>
-                <div className="mt-4 flex flex-wrap gap-3 text-xs text-muted-foreground">
-                  <span>{project.chatsCount} conversas</span>
-                  <span>{project.filesCount} arquivos</span>
-                  <span>{project.artifactsCount} criações</span>
-                </div>
-              </Link>
             ))}
           </div>
-        </section>
-
-        <section>
-          <SectionHeader eyebrow="retomar conversa" title="Último diálogo" />
-          <GlassCard className="h-full min-h-52 flex flex-col justify-between" hoverable={false}>
-            {latestChat ? (
-              <>
-                <div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Clock3 className="size-3.5" />
-                    {formatDistanceToNow(new Date(latestChat.updatedAt), { addSuffix: true, locale: ptBR })}
-                  </div>
-                  <h3 className="mt-4 text-lg font-semibold">{latestChat.title}</h3>
-                  <p className="mt-2 text-sm text-muted-foreground">continue com o mesmo contexto, modo e histórico.</p>
-                </div>
-                <Button className="mt-6 w-full" asChild>
-                  <Link to="/app/chat">retomar conversa <ArrowRight className="ml-1 size-4" /></Link>
-                </Button>
-              </>
-            ) : (
-              <div className="flex h-full flex-col items-center justify-center py-8 text-center">
-                <MessageSquare className="size-8 text-muted-foreground" />
-                <p className="mt-3 text-sm text-muted-foreground">sua primeira conversa começa aqui.</p>
-                <Button className="mt-4" asChild><Link to="/app/chat">abrir chat</Link></Button>
-              </div>
-            )}
-          </GlassCard>
-        </section>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-3">
-        <section className="lg:col-span-2">
-          <SectionHeader eyebrow="memória" title="Aguardando sua decisão" />
-          {memories.length > 0 ? (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {memories.slice(0, 4).map((memory) => (
-                <Link key={memory.id} to="/app/memory" className="orbe-card orbe-card-hover block p-4">
-                  <div className="flex items-center gap-2">
-                    <Brain className="size-4 text-[var(--orbe-blue)]" />
-                    <span className="text-sm font-medium">{memory.label}</span>
-                  </div>
-                  <p className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">{memory.content}</p>
-                </Link>
-              ))}
-            </div>
-          ) : (
-            <GlassCard hoverable={false}>
-              <p className="text-sm text-muted-foreground">nenhuma memória pendente. tudo organizado por aqui.</p>
-            </GlassCard>
-          )}
-        </section>
-
-        <section>
-          <SectionHeader eyebrow="sugestão da orbeAI" title="Próximo passo" />
-          <GlassCard className="relative overflow-hidden" hoverable={false}>
-            <Sparkles className="size-5 text-[var(--orbe-blue)]" />
-            <h3 className="mt-4 font-semibold">Transforme contexto em conhecimento</h3>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Reúna documentos e referências de um projeto para a orbeAI responder com uma base mais sólida.
-            </p>
-            <Button variant="outline" className="mt-5 w-full" asChild>
-              <Link to="/app/research"><BookOpen className="mr-1 size-4" /> abrir conhecimento</Link>
-            </Button>
-          </GlassCard>
-        </section>
-      </div>
-    </div>
-  );
-}
-
-function OverviewCard({
-  icon,
-  value,
-  label,
-  description,
-  to,
-}: {
-  icon: typeof FolderKanban;
-  value: string;
-  label: string;
-  description: string;
-  to: string;
-}) {
-  const Icon = icon;
-
-  return (
-    <Link to={to as never} className="group orbe-card orbe-card-hover flex items-center gap-4 p-5">
-      <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[color-mix(in_oklch,var(--orbe-blue)_10%,transparent)]">
-        <Icon className="size-5 text-[var(--orbe-blue)]" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-baseline gap-2">
-          <span className="text-2xl font-semibold tabular-nums">{value}</span>
-          <span className="text-sm font-medium">{label}</span>
         </div>
-        <p className="mt-0.5 truncate text-xs text-muted-foreground">{description}</p>
-      </div>
-      <ArrowRight className="size-4 text-muted-foreground/30 transition-transform group-hover:translate-x-1 group-hover:text-muted-foreground" />
-    </Link>
+      </section>
+
+      <section className="space-y-4">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">explorar</p>
+          <h2 className="mt-1 text-2xl font-semibold tracking-tight">Escolha um ponto de partida</h2>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {exploreItems.map(({ title, description, icon: Icon, to }) => (
+            <Link
+              key={title}
+              to={to}
+              className="group flex min-h-36 items-start gap-4 rounded-2xl border border-border/70 bg-card p-5 transition hover:-translate-y-0.5 hover:border-[color-mix(in_oklch,var(--orbe-blue)_30%,var(--border))] hover:shadow-md"
+            >
+              <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[color-mix(in_oklch,var(--orbe-blue)_9%,transparent)]">
+                <Icon className="size-5 text-[var(--orbe-blue)]" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="font-medium">{title}</h3>
+                  <ArrowRight className="size-4 shrink-0 text-muted-foreground/50 transition group-hover:translate-x-0.5 group-hover:text-[var(--orbe-blue)]" />
+                </div>
+                <p className="mt-2 text-sm leading-5 text-muted-foreground">{description}</p>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">continuar</p>
+            <h2 className="mt-1 text-2xl font-semibold tracking-tight">Retome de onde parou</h2>
+          </div>
+          <Button variant="ghost" size="sm" asChild>
+            <Link to="/app/chat">Ver tudo <ArrowRight className="ml-1 size-4" /></Link>
+          </Button>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-12">
+          <Link
+            to="/app/chat"
+            className="group rounded-3xl border border-border/70 bg-card p-6 transition hover:border-[color-mix(in_oklch,var(--orbe-blue)_30%,var(--border))] hover:shadow-md lg:col-span-7"
+          >
+            <div className="flex items-start gap-4">
+              <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-[color-mix(in_oklch,var(--orbe-blue)_10%,transparent)]">
+                <MessageSquare className="size-5 text-[var(--orbe-blue)]" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">última conversa</p>
+                <h3 className="mt-2 truncate text-xl font-semibold">
+                  {latestChat?.title || "Comece sua primeira conversa"}
+                </h3>
+                <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted-foreground">
+                  {latestChat
+                    ? `Continue no modo ${latestChat.mode || "padrão"} com todo o contexto preservado.`
+                    : "A orbeAI está pronta para conhecer seu jeito de pensar e trabalhar com você."}
+                </p>
+                <div className="mt-5 flex items-center gap-2 text-sm font-medium text-[var(--orbe-blue)]">
+                  {latestChat ? "Continuar conversa" : "Abrir chat"}
+                  <ArrowRight className="size-4 transition group-hover:translate-x-0.5" />
+                </div>
+              </div>
+            </div>
+          </Link>
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:col-span-5 lg:grid-cols-1">
+            <Link
+              to={latestProject ? "/app/projects/$id" : "/app/projects"}
+              params={latestProject ? { id: latestProject.id } : undefined}
+              className="group flex min-h-32 items-start gap-4 rounded-2xl border border-border/70 bg-card p-5 transition hover:border-[color-mix(in_oklch,var(--orbe-blue)_30%,var(--border))] hover:shadow-md"
+            >
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[color-mix(in_oklch,var(--orbe-cyan)_10%,transparent)]">
+                <FolderKanban className="size-5 text-[var(--orbe-blue)]" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">projeto recente</p>
+                <h3 className="mt-1 truncate font-medium">{latestProject?.name || "Crie um espaço para uma ideia"}</h3>
+                <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                  {latestProject?.description || "Junte conversas, arquivos e referências em um só lugar."}
+                </p>
+              </div>
+            </Link>
+
+            <Link
+              to="/app/artifacts"
+              className="group flex min-h-32 items-start gap-4 rounded-2xl border border-border/70 bg-card p-5 transition hover:border-[color-mix(in_oklch,var(--orbe-blue)_30%,var(--border))] hover:shadow-md"
+            >
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[color-mix(in_oklch,var(--orbe-blue)_9%,transparent)]">
+                <Library className="size-5 text-[var(--orbe-blue)]" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">criação recente</p>
+                <h3 className="mt-1 truncate font-medium">{latestArtifact?.title || "Sua biblioteca começa aqui"}</h3>
+                <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                  {latestArtifact ? `Criado ${formatDistanceToNow(new Date(latestArtifact.updatedAt), { addSuffix: true, locale: ptBR })}.` : "Textos, planos e criações ficam organizados para você reencontrar."}
+                </p>
+              </div>
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-3">
+        <Link to="/app/memory" className="rounded-2xl border border-border/70 bg-card p-5 transition hover:shadow-md">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex size-10 items-center justify-center rounded-xl bg-[color-mix(in_oklch,var(--orbe-blue)_9%,transparent)]">
+              <Brain className="size-5 text-[var(--orbe-blue)]" />
+            </div>
+            <span className="text-2xl font-semibold tabular-nums">{memories.length}</span>
+          </div>
+          <h3 className="mt-4 font-medium">Memórias para revisar</h3>
+          <p className="mt-1 text-sm text-muted-foreground">Você decide o que a orbeAI deve guardar sobre você.</p>
+        </Link>
+
+        <Link to="/app/projects" className="rounded-2xl border border-border/70 bg-card p-5 transition hover:shadow-md">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex size-10 items-center justify-center rounded-xl bg-[color-mix(in_oklch,var(--orbe-cyan)_10%,transparent)]">
+              <BookOpen className="size-5 text-[var(--orbe-blue)]" />
+            </div>
+            <span className="text-2xl font-semibold tabular-nums">{projects.length}</span>
+          </div>
+          <h3 className="mt-4 font-medium">Espaços em andamento</h3>
+          <p className="mt-1 text-sm text-muted-foreground">De planos pessoais a projetos profissionais, tudo cabe aqui.</p>
+        </Link>
+
+        <Link to="/app/artifacts" className="rounded-2xl border border-border/70 bg-card p-5 transition hover:shadow-md">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex size-10 items-center justify-center rounded-xl bg-[color-mix(in_oklch,var(--orbe-blue)_9%,transparent)]">
+              <Library className="size-5 text-[var(--orbe-blue)]" />
+            </div>
+            <span className="text-2xl font-semibold tabular-nums">{artifacts.length}</span>
+          </div>
+          <h3 className="mt-4 font-medium">Itens na biblioteca</h3>
+          <p className="mt-1 text-sm text-muted-foreground">Tudo o que você criou, pronto para continuar evoluindo.</p>
+        </Link>
+      </section>
+    </div>
   );
 }
