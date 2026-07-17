@@ -1,194 +1,457 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { GlassCard, Pill, SectionHeader } from "@/components/design-system/Primitives";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { formatDistanceToNow } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import {
+  ArrowRight,
+  BookOpen,
+  CheckCircle2,
+  Download,
+  FileText,
+  FolderOpen,
+  Globe2,
+  Link2,
+  Loader2,
+  MessageSquare,
+  Plus,
+  Search,
+  Sparkles,
+} from "lucide-react";
+import { toast } from "sonner";
+
+import { EmptyState } from "@/components/common/EmptyState";
+import { OrbeMark } from "@/components/design-system/OrbeLogo";
+import { Pill } from "@/components/design-system/Primitives";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Progress } from "@/components/ui/progress";
-import { Checkbox } from "@/components/ui/checkbox";
-import { EmptyState } from "@/components/common/EmptyState";
-import { researchService, artifactService } from "@/lib/api";
-import type { ResearchReport } from "@/types";
-import { AlertTriangle, Calendar, Download, FileSearch, FlaskConical, Globe, Library, Loader2, Save, Send, Workflow } from "lucide-react";
-import { toast } from "sonner";
+import { artifactService, researchService } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import type { ResearchReport, ResearchSource } from "@/types";
 
 export const Route = createFileRoute("/app/research")({
-  head: () => ({ meta: [{ title: "Pesquisa profunda · orbeAI" }] }),
-  component: ResearchPage,
+  head: () => ({ meta: [{ title: "Conhecimento · orbeAI" }] }),
+  component: KnowledgePage,
 });
 
-const SOURCES = [
-  { id: "web", label: "Web", icon: Globe },
-  { id: "files", label: "Arquivos do projeto", icon: FileSearch },
-  { id: "internal", label: "Base interna orbeOne", icon: Library },
-  { id: "uploads", label: "Documentos enviados", icon: FileSearch },
-  { id: "integrations", label: "Integrações conectadas", icon: Workflow },
-];
+type KnowledgeMaterial = ResearchSource & {
+  addedNow?: boolean;
+};
 
-function ResearchPage() {
+function materialKindLabel(kind: ResearchSource["kind"]) {
+  if (kind === "web") return "site";
+  if (kind === "arquivo") return "arquivo";
+  if (kind === "interna") return "espaço interno";
+  return "fonte conectada";
+}
+
+function MaterialIcon({ kind }: { kind: ResearchSource["kind"] }) {
+  if (kind === "web") return <Globe2 className="size-4" />;
+  if (kind === "arquivo") return <FileText className="size-4" />;
+  if (kind === "interna") return <FolderOpen className="size-4" />;
+  return <Link2 className="size-4" />;
+}
+
+function KnowledgePage() {
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [reports, setReports] = useState<ResearchReport[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [q, setQ] = useState("Quem são os concorrentes globais de cockpits cognitivos enterprise?");
-  const [selected, setSelected] = useState<string[]>(["web", "internal"]);
+  const [question, setQuestion] = useState("");
+  const [search, setSearch] = useState("");
   const [running, setRunning] = useState(false);
+  const [addedMaterials, setAddedMaterials] = useState<KnowledgeMaterial[]>([]);
 
   async function refresh(selectId?: string) {
     const list = await researchService.list();
     setReports(list);
     setActiveId(selectId ?? activeId ?? list[0]?.id ?? null);
   }
-  useEffect(() => { void refresh(); }, []);
 
-  const active = reports.find((r) => r.id === activeId) ?? null;
+  useEffect(() => {
+    void refresh();
+  }, []);
 
-  function toggle(id: string) {
-    setSelected((s) => s.includes(id) ? s.filter((x) => x !== id) : [...s, id]);
+  const active = reports.find((report) => report.id === activeId) ?? null;
+
+  const sourceMaterials = useMemo(() => {
+    const unique = new Map<string, KnowledgeMaterial>();
+
+    reports.forEach((report) => {
+      report.sources.forEach((source) => {
+        if (!unique.has(source.id)) unique.set(source.id, source);
+      });
+    });
+
+    return Array.from(unique.values());
+  }, [reports]);
+
+  const materials = [...addedMaterials, ...sourceMaterials];
+  const filteredMaterials = materials.filter((material) => {
+    const query = search.trim().toLowerCase();
+    if (!query) return true;
+
+    return `${material.title} ${material.excerpt}`.toLowerCase().includes(query);
+  });
+
+  const ongoing = reports.filter((report) => report.status === "em andamento").length;
+  const completed = reports.filter((report) => report.status === "concluído").length;
+
+  async function startResearch() {
+    if (!question.trim()) return;
+
+    setRunning(true);
+
+    try {
+      const created = await researchService.create({ question: question.trim() });
+      await new Promise((resolve) => setTimeout(resolve, 700));
+      await researchService.update(created.id, { status: "em andamento" });
+      setQuestion("");
+      await refresh(created.id);
+      toast.success("Pesquisa iniciada", {
+        description: "A orbeAI está organizando as melhores fontes para essa pergunta.",
+      });
+    } finally {
+      setRunning(false);
+    }
   }
 
-  async function start() {
-    if (!q.trim()) return;
-    setRunning(true);
-    const r = await researchService.create({ question: q });
-    await new Promise((res) => setTimeout(res, 1200));
-    await researchService.update(r.id, { status: "em andamento" });
-    setRunning(false);
-    toast.success("Pesquisa iniciada");
-    await refresh(r.id);
+  function addMaterial(file: File) {
+    const material: KnowledgeMaterial = {
+      id: `upload_${Date.now()}`,
+      title: file.name,
+      kind: "arquivo",
+      excerpt: `Material enviado agora · ${Math.max(1, Math.round(file.size / 1024))} KB`,
+      confidence: 1,
+      addedNow: true,
+    };
+
+    setAddedMaterials((current) => [material, ...current]);
+    toast.success("Material adicionado à prévia", {
+      description: "Ele já aparece na sua área de conhecimento.",
+    });
   }
 
   async function exportReport() {
     if (!active) return;
-    const md = `# ${active.question}\n\n## Plano\n${active.plan.map((p, i) => `${i + 1}. ${p}`).join("\n")}\n\n## Síntese\n${active.summary || "—"}\n\n## Riscos\n${active.risks.map((r) => `- ${r}`).join("\n")}\n`;
-    const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
+
+    const markdown = [
+      `# ${active.question}`,
+      "",
+      active.summary || "Pesquisa ainda em andamento.",
+      "",
+      "## Fontes",
+      ...active.sources.map((source) => `- ${source.title}`),
+      "",
+      "## Pontos para conferir",
+      ...active.risks.map((risk) => `- ${risk}`),
+    ].join("\n");
+
+    const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `pesquisa_${active.id}.md`; a.click();
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `conhecimento_${active.id}.md`;
+    anchor.click();
     URL.revokeObjectURL(url);
   }
 
-  async function saveAsArtifact() {
+  async function saveToLibrary() {
     if (!active) return;
-    const md = `# ${active.question}\n\n${active.summary}\n\n## Riscos\n${active.risks.map((r) => `- ${r}`).join("\n")}`;
-    await artifactService.create({ title: `Pesquisa — ${active.question.slice(0, 60)}`, kind: "relatório", content: md });
-    toast.success("Salvo como artifact");
+
+    const markdown = `# ${active.question}\n\n${active.summary || "Pesquisa ainda em andamento."}\n\n## Pontos para conferir\n${active.risks.map((risk) => `- ${risk}`).join("\n")}`;
+
+    await artifactService.create({
+      title: active.question.slice(0, 80),
+      kind: "relatório",
+      content: markdown,
+    });
+
+    toast.success("Salvo na Biblioteca");
   }
 
   return (
-    <div className="space-y-6">
-      <SectionHeader eyebrow="research lab" title="Pesquisa profunda multifonte"
-        description="Plano de pesquisa, fontes, evidências, incertezas e síntese executiva." />
-
-      <GlassCard>
-        <div className="flex flex-col gap-3">
-          <label className="text-sm font-medium">Pergunta de pesquisa</label>
-          <div className="flex gap-2">
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Formule a pergunta…" />
-            <Button onClick={start} disabled={running}>
-              {running ? <Loader2 className="size-4 mr-1 animate-spin" /> : <Send className="size-4 mr-1" />}
-              {running ? "Pesquisando…" : "Iniciar"}
-            </Button>
-          </div>
+    <div className="mx-auto w-full max-w-[1360px] space-y-6">
+      <section className="overflow-hidden rounded-[1.75rem] border border-border/70 bg-[linear-gradient(135deg,rgba(239,246,255,0.95),rgba(255,255,255,0.98)_55%,rgba(236,254,255,0.72))] p-6 shadow-[0_24px_70px_-55px_rgba(15,23,42,0.65)] md:p-8">
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-center">
           <div>
-            <div className="orbe-eyebrow mb-2">Fontes</div>
-            <div className="flex flex-wrap gap-2">
-              {SOURCES.map((s) => {
-                const Icon = s.icon; const on = selected.includes(s.id);
-                return (
-                  <label key={s.id} className={cn("inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm cursor-pointer transition-colors",
-                    on ? "border-[color-mix(in_oklch,var(--orbe-blue)_40%,transparent)] bg-[color-mix(in_oklch,var(--orbe-blue)_8%,transparent)]" : "border-border/70 hover:bg-accent/40")}>
-                    <Checkbox checked={on} onCheckedChange={() => toggle(s.id)} />
-                    <Icon className={cn("size-4", on ? "text-[var(--orbe-blue)]" : "text-muted-foreground")} /> {s.label}
-                  </label>
-                );
-              })}
+            <div className="mb-5 flex size-11 items-center justify-center rounded-2xl border border-blue-100 bg-white shadow-sm">
+              <OrbeMark size={23} />
+            </div>
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">conhecimento</div>
+            <h1 className="mt-2 max-w-2xl text-3xl font-semibold tracking-tight md:text-4xl">
+              tudo que ajuda a orbeAI a entender melhor o que importa para você.
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground md:text-base">
+              Reúna materiais, consulte fontes e faça perguntas mais profundas. A orbeAI organiza o caminho sem exigir que você configure ferramentas ou escolha onde procurar.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-white/80 bg-white/82 p-4 shadow-[0_18px_46px_-38px_rgba(15,23,42,0.65)] backdrop-blur-xl">
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              <Sparkles className="size-4 text-blue-600" />
+              o que você quer descobrir?
+            </div>
+            <div className="mt-3 flex gap-2">
+              <Input
+                value={question}
+                onChange={(event) => setQuestion(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") void startResearch();
+                }}
+                placeholder="Ex.: monte um roteiro econômico para Buenos Aires"
+                className="h-11 bg-white"
+              />
+              <Button
+                size="icon"
+                className="size-11 shrink-0 rounded-xl"
+                onClick={() => void startResearch()}
+                disabled={!question.trim() || running}
+                aria-label="Pesquisar"
+              >
+                {running ? <Loader2 className="size-4 animate-spin" /> : <ArrowRight className="size-4" />}
+              </Button>
+            </div>
+            <p className="mt-2 text-[11px] leading-4 text-muted-foreground">
+              A orbeAI decide quando usar seus materiais, fontes conectadas ou pesquisa externa.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <StatCard value={materials.length} label="materiais disponíveis" icon={<BookOpen className="size-4" />} />
+        <StatCard value={reports.length} label="pesquisas" icon={<Search className="size-4" />} />
+        <StatCard
+          value={ongoing || completed}
+          label={ongoing > 0 ? "em andamento" : "concluídas"}
+          icon={ongoing > 0 ? <Loader2 className="size-4" /> : <CheckCircle2 className="size-4" />}
+        />
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
+        <section className="rounded-2xl border border-border/70 bg-card p-5 shadow-[0_18px_55px_-48px_rgba(15,23,42,0.7)]">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">Seus materiais</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Arquivos e fontes que podem ser usados quando forem relevantes.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) addMaterial(file);
+                  event.target.value = "";
+                }}
+              />
+              <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+                <Plus className="mr-1 size-4" /> Adicionar material
+              </Button>
             </div>
           </div>
-        </div>
-      </GlassCard>
 
-      {reports.length > 1 && (
-        <div className="flex gap-2 flex-wrap">
-          {reports.map((r) => (
-            <button key={r.id} onClick={() => setActiveId(r.id)}
-              className={cn("px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
-                activeId === r.id
-                  ? "bg-[var(--orbe-blue)] text-white border-transparent shadow-[var(--shadow-xs)]"
-                  : "border-border/70 text-muted-foreground hover:text-foreground hover:bg-accent/50")}>
-              {r.question.slice(0, 48)}{r.question.length > 48 ? "…" : ""}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {!active ? (
-        <EmptyState icon={<FlaskConical className="size-6" />} title="Nenhuma pesquisa ainda"
-          description="Formule uma pergunta acima e inicie a primeira investigação." />
-      ) : (
-        <>
-          <div className="grid lg:grid-cols-3 gap-4">
-            <GlassCard className="lg:col-span-2">
-              <SectionHeader eyebrow="plano de pesquisa" title="Etapas previstas" />
-              <ol className="space-y-3.5">
-                {active.plan.map((step, i) => (
-                  <li key={i} className="flex items-start gap-3">
-                    <div className="size-6 rounded-full bg-gradient-to-br from-[var(--orbe-blue)] to-[var(--orbe-cyan)] text-white text-xs font-medium flex items-center justify-center shrink-0 shadow-[var(--shadow-xs)]">{i + 1}</div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm">{step}</div>
-                      <Progress value={i === 0 ? 100 : i === 1 ? 60 : 20} className="mt-2 h-1.5" />
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            </GlassCard>
-
-            <GlassCard>
-              <SectionHeader eyebrow="ações" title="Resultados" />
-              <div className="flex flex-col gap-2">
-                <Button variant="outline" onClick={exportReport}><Download className="size-4 mr-1" /> Exportar .md</Button>
-                <Button variant="outline" onClick={saveAsArtifact}><Save className="size-4 mr-1" /> Salvar como artifact</Button>
-              </div>
-              <div className="mt-4 text-xs text-muted-foreground">
-                <div className="inline-flex items-center gap-1.5"><Calendar className="size-3" /> {new Date(active.updatedAt).toLocaleString("pt-BR")}</div>
-                <div className="mt-1">Status: <Pill tone={active.status === "concluído" ? "success" : "warn"}>{active.status}</Pill></div>
-              </div>
-            </GlassCard>
+          <div className="relative mt-5">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Buscar nos materiais…"
+              className="h-10 bg-background pl-9"
+            />
           </div>
 
-          {active.sources.length > 0 && (
-            <>
-              <SectionHeader eyebrow="evidências" title="Fontes coletadas" />
-              <div className="grid md:grid-cols-3 gap-3">
-                {active.sources.map((s) => (
-                  <GlassCard key={s.id}>
-                    <div className="flex items-center justify-between">
-                      <Pill tone="blue">{s.kind}</Pill>
-                      <span className="text-xs text-muted-foreground tabular-nums">conf. {(s.confidence * 100).toFixed(0)}%</span>
+          {filteredMaterials.length === 0 ? (
+            <div className="mt-5">
+              <EmptyState
+                icon={<BookOpen className="size-6" />}
+                title={materials.length === 0 ? "Nenhum material ainda" : "Nada encontrado"}
+                description={
+                  materials.length === 0
+                    ? "Adicione um arquivo ou faça uma pesquisa para começar a construir seu conhecimento."
+                    : "Tente buscar por outro nome ou assunto."
+                }
+                action={
+                  materials.length === 0 ? (
+                    <Button onClick={() => fileInputRef.current?.click()}>
+                      <Plus className="mr-1 size-4" /> Adicionar material
+                    </Button>
+                  ) : undefined
+                }
+              />
+            </div>
+          ) : (
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              {filteredMaterials.map((material) => (
+                <article
+                  key={material.id}
+                  className="rounded-xl border border-border/65 bg-background/65 p-4 transition hover:border-blue-200 hover:bg-blue-50/30"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-border/70 bg-white text-blue-700">
+                      <MaterialIcon kind={material.kind} />
                     </div>
-                    <div className="font-medium mt-2.5 text-sm">{s.title}</div>
-                    <p className="text-xs text-muted-foreground mt-2 leading-relaxed line-clamp-4">{s.excerpt}</p>
-                  </GlassCard>
-                ))}
-              </div>
-            </>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="line-clamp-2 text-sm font-medium leading-5">{material.title}</h3>
+                        {material.addedNow && <Pill tone="success">novo</Pill>}
+                      </div>
+                      <p className="mt-1.5 line-clamp-2 text-xs leading-5 text-muted-foreground">
+                        {material.excerpt}
+                      </p>
+                      <div className="mt-3 text-[11px] text-muted-foreground">
+                        {materialKindLabel(material.kind)}
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
           )}
+        </section>
 
-          <div className="grid lg:grid-cols-2 gap-4">
-            <GlassCard>
-              <SectionHeader eyebrow="síntese executiva" title="Resumo" />
-              <p className="text-sm whitespace-pre-wrap">{active.summary || "Síntese ainda não consolidada."}</p>
-            </GlassCard>
-            <GlassCard>
-              <SectionHeader eyebrow="incertezas e riscos" title="O que ainda não é certo" />
-              {active.risks.length === 0
-                ? <p className="text-sm text-muted-foreground">Nenhum risco mapeado ainda.</p>
-                : <ul className="space-y-2">
-                    {active.risks.map((r, i) => (
-                      <li key={i} className="flex items-start gap-2 text-sm"><AlertTriangle className="size-4 text-[var(--warning)] mt-0.5" /> {r}</li>
-                    ))}
-                  </ul>}
-            </GlassCard>
+        <section className="rounded-2xl border border-border/70 bg-card p-5 shadow-[0_18px_55px_-48px_rgba(15,23,42,0.7)]">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold">Pesquisas recentes</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Perguntas que a orbeAI está investigando para você.
+              </p>
+            </div>
+            <Button variant="ghost" size="icon" asChild>
+              <Link to="/app/chat" aria-label="Abrir chat">
+                <MessageSquare className="size-4" />
+              </Link>
+            </Button>
           </div>
-        </>
+
+          {reports.length === 0 ? (
+            <div className="mt-5 rounded-xl border border-dashed border-border p-6 text-center">
+              <Search className="mx-auto size-5 text-muted-foreground" />
+              <div className="mt-2 text-sm font-medium">Nenhuma pesquisa ainda</div>
+              <p className="mt-1 text-xs text-muted-foreground">Faça uma pergunta no topo da página para começar.</p>
+            </div>
+          ) : (
+            <div className="mt-4 space-y-2">
+              {reports.map((report) => (
+                <button
+                  key={report.id}
+                  type="button"
+                  onClick={() => setActiveId(report.id)}
+                  className={cn(
+                    "w-full rounded-xl border p-3.5 text-left transition",
+                    activeId === report.id
+                      ? "border-blue-200 bg-blue-50/65"
+                      : "border-border/60 bg-background/55 hover:border-border hover:bg-muted/35",
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="line-clamp-2 text-sm font-medium leading-5">{report.question}</div>
+                    <span
+                      className={cn(
+                        "mt-1 size-2 shrink-0 rounded-full",
+                        report.status === "concluído" ? "bg-emerald-500" : "bg-amber-400",
+                      )}
+                    />
+                  </div>
+                  <div className="mt-2 flex items-center justify-between gap-3 text-[11px] text-muted-foreground">
+                    <span>{report.sources.length} fontes</span>
+                    <span>{formatDistanceToNow(new Date(report.updatedAt), { addSuffix: true, locale: ptBR })}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+
+      {active && (
+        <section className="overflow-hidden rounded-2xl border border-border/70 bg-card shadow-[0_18px_55px_-48px_rgba(15,23,42,0.7)]">
+          <div className="flex flex-col gap-4 border-b border-border/60 px-5 py-5 md:flex-row md:items-start md:justify-between">
+            <div className="max-w-3xl">
+              <div className="flex items-center gap-2 text-xs font-medium text-blue-700">
+                <Sparkles className="size-3.5" /> pesquisa selecionada
+              </div>
+              <h2 className="mt-2 text-xl font-semibold tracking-tight">{active.question}</h2>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Pill tone={active.status === "concluído" ? "success" : "warn"}>{active.status}</Pill>
+                <Pill tone="muted">{active.sources.length} fontes encontradas</Pill>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={() => void exportReport()}>
+                <Download className="mr-1 size-4" /> Exportar
+              </Button>
+              <Button onClick={() => void saveToLibrary()}>
+                <BookOpen className="mr-1 size-4" /> Salvar na Biblioteca
+              </Button>
+            </div>
+          </div>
+
+          <div className="grid gap-0 lg:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
+            <div className="p-5 md:p-6">
+              <h3 className="text-sm font-semibold">O que a orbeAI encontrou</h3>
+              <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-foreground/90">
+                {active.summary || "A pesquisa ainda está sendo organizada. Os resultados aparecerão aqui quando a síntese estiver pronta."}
+              </p>
+
+              {active.risks.length > 0 && (
+                <div className="mt-6 rounded-xl border border-amber-200/70 bg-amber-50/55 p-4">
+                  <div className="text-sm font-semibold">Pontos que ainda merecem atenção</div>
+                  <ul className="mt-2 space-y-2 text-sm text-muted-foreground">
+                    {active.risks.map((risk) => (
+                      <li key={risk} className="flex items-start gap-2">
+                        <span className="mt-2 size-1.5 shrink-0 rounded-full bg-amber-500" />
+                        <span>{risk}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            <aside className="border-t border-border/60 bg-muted/20 p-5 lg:border-l lg:border-t-0">
+              <h3 className="text-sm font-semibold">Fontes usadas</h3>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                Você sempre pode conferir de onde veio cada parte da resposta.
+              </p>
+
+              {active.sources.length === 0 ? (
+                <div className="mt-4 rounded-xl border border-dashed border-border p-4 text-xs text-muted-foreground">
+                  As fontes aparecerão aqui conforme a pesquisa avançar.
+                </div>
+              ) : (
+                <div className="mt-4 space-y-3">
+                  {active.sources.map((source) => (
+                    <article key={source.id} className="rounded-xl border border-border/60 bg-card p-3.5">
+                      <div className="flex items-center gap-2 text-blue-700">
+                        <MaterialIcon kind={source.kind} />
+                        <span className="text-[11px] font-medium">{materialKindLabel(source.kind)}</span>
+                      </div>
+                      <div className="mt-2 text-sm font-medium leading-5">{source.title}</div>
+                      <p className="mt-1 line-clamp-3 text-xs leading-5 text-muted-foreground">{source.excerpt}</p>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </aside>
+          </div>
+        </section>
       )}
+    </div>
+  );
+}
+
+function StatCard({ value, label, icon }: { value: number; label: string; icon: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-3 rounded-2xl border border-border/65 bg-card px-4 py-3.5">
+      <div className="flex size-9 items-center justify-center rounded-xl bg-blue-50 text-blue-700">{icon}</div>
+      <div>
+        <div className="text-xl font-semibold tabular-nums">{value}</div>
+        <div className="text-xs text-muted-foreground">{label}</div>
+      </div>
     </div>
   );
 }
