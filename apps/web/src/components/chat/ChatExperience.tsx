@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { ChatMode, ModelKey } from "@/types";
+import type { ChatMode } from "@/types";
 
 import { ChatBubble } from "./ChatBubble";
 import { ChatComposer } from "./ChatComposer";
@@ -33,16 +33,6 @@ const MODES: ChatMode[] = [
   "ops",
   "mentor",
   "safe",
-];
-
-const MODELS: { key: ModelKey; label: string }[] = [
-  { key: "auto", label: "Automático" },
-  { key: "gpt", label: "GPT" },
-  { key: "claude", label: "Claude" },
-  { key: "gemini", label: "Gemini" },
-  { key: "qwen", label: "Qwen" },
-  { key: "groq", label: "Groq" },
-  { key: "local", label: "Local" },
 ];
 
 function compactChatTitle(title: string, limit = 58): string {
@@ -94,8 +84,6 @@ export function ChatExperience() {
               </div>
               <div className="mt-0.5 flex min-w-0 items-center gap-1.5 truncate text-[11px] text-muted-foreground">
                 <span>orbe {chat.mode}</span>
-                <span className="text-muted-foreground/35">·</span>
-                <span>{MODELS.find((item) => item.key === chat.model)?.label}</span>
                 {chat.project && (
                   <>
                     <span className="text-muted-foreground/35">·</span>
@@ -111,7 +99,7 @@ export function ChatExperience() {
               </div>
             </div>
 
-            <div className="hidden items-center gap-1.5 lg:flex">
+            <div className="hidden items-center lg:flex">
               <Select value={chat.mode} onValueChange={(value) => chat.setMode(value as ChatMode)}>
                 <SelectTrigger className="h-8 w-[116px] rounded-lg bg-background px-2 text-xs">
                   <SelectValue />
@@ -120,18 +108,6 @@ export function ChatExperience() {
                   {MODES.map((item) => (
                     <SelectItem key={item} value={item}>
                       orbe {item}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={chat.model} onValueChange={(value) => chat.setModel(value as ModelKey)}>
-                <SelectTrigger className="h-8 w-[132px] rounded-lg bg-background px-2 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {MODELS.map((item) => (
-                    <SelectItem key={item.key} value={item.key}>
-                      {item.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
