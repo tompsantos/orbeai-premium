@@ -1,0 +1,45 @@
+name: publish clean documentation branch
+
+on:
+  push:
+    branches:
+      - docs/institutionalize-project-docs
+    paths:
+      - .github/workflows/publish-clean-docs-branch.yml
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: docs/institutionalize-project-docs
+          fetch-depth: 0
+
+      - name: verify exact source documents
+        run: |
+          set -euo pipefail
+          echo '52ed3af2e904b677eddd0f4ef49af24ec2cd37684c04aae4ca193b2637d790d7  docs/projeto-orbeai-premium.pdf' | sha256sum -c -
+          echo '55301882e989586d78b8912947d984ccd42675fb7d5230142edd5812e79049fb  ROADMAP.md' | sha256sum -c -
+          echo '2c75168854f8f888f6ea96146cd31369cd4bf89c405089b9c6ed6a6acb6ff285  README.md' | sha256sum -c -
+
+      - name: publish one-commit clean branch
+        run: |
+          set -euo pipefail
+          tmpdir="$(mktemp -d)"
+          cp README.md ROADMAP.md "$tmpdir/"
+          cp docs/projeto-orbeai-premium.pdf "$tmpdir/"
+          git fetch origin main
+          git checkout -B docs/official-project-docs-clean origin/main
+          mkdir -p docs
+          cp "$tmpdir/README.md" README.md
+          cp "$tmpdir/ROADMAP.md" ROADMAP.md
+          cp "$tmpdir/projeto-orbeai-premium.pdf" docs/projeto-orbeai-premium.pdf
+          git config user.name 'orbeAI engineering bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add README.md ROADMAP.md docs/projeto-orbeai-premium.pdf
+          git commit -m 'docs: institutionalize project constitution and roadmap'
+          git push --force origin HEAD:docs/official-project-docs-clean
