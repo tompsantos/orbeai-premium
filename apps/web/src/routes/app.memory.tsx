@@ -1,87 +1,72 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { GlassCard, Pill, SectionHeader } from "@/components/design-system/Primitives";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { MemoryDialog } from "@/components/memory/MemoryDialog";
-import { ConfirmDialog } from "@/components/common/ConfirmDialog";
-import { EmptyState } from "@/components/common/EmptyState";
-import { memoryService } from "@/lib/api";
-import type { MemoryItem } from "@/types";
 import {
   Archive,
   Brain,
   Check,
-  Clock,
   Download,
+  Folder,
+  Globe2,
+  LockKeyhole,
   Pencil,
   Plus,
   Search,
-  Shield,
+  ShieldCheck,
   Sparkles,
   Trash2,
   X,
 } from "lucide-react";
-import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { toast } from "sonner";
+
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { MemoryDialog } from "@/components/memory/MemoryDialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { memoryService } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import type { MemoryItem } from "@/types";
 
 export const Route = createFileRoute("/app/memory")({
   head: () => ({ meta: [{ title: "Memória · orbeAI" }] }),
   component: MemoryPage,
 });
 
-const TABS = ["todas", "ativas", "pendentes", "automáticas", "global", "projeto", "sensível", "arquivada"] as const;
-type Tab = typeof TABS[number];
+type MemoryWithMeta = MemoryItem & { reason?: string };
+type Filter = "todas" | "ativas" | "pendentes" | "arquivadas";
 
-type MemoryWithMeta = MemoryItem & {
-  reason?: string;
-};
+const FILTERS: Array<{ key: Filter; label: string }> = [
+  { key: "todas", label: "Tudo" },
+  { key: "ativas", label: "Em uso" },
+  { key: "pendentes", label: "Para confirmar" },
+  { key: "arquivadas", label: "Guardadas" },
+];
 
-function isAutoMemory(memory: MemoryWithMeta) {
+function isAutomatic(memory: MemoryWithMeta) {
   return memory.source === "chat" && Boolean(memory.sourceEntityId);
 }
 
-function sourceLabel(memory: MemoryWithMeta) {
-  if (isAutoMemory(memory)) return "automática";
-  if (memory.source === "chat") return "chat manual";
-
-  return memory.source;
+function memoryOrigin(memory: MemoryWithMeta) {
+  if (isAutomatic(memory)) return "Aprendida numa conversa";
+  if (memory.source === "chat") return "Salva de uma conversa";
+  if (memory.source === "documento") return "Lembrada de um arquivo";
+  if (memory.source === "agente") return "Sugerida pela orbeAI";
+  return "Adicionada por você";
 }
 
-function contextLabel(memory: MemoryWithMeta) {
-  if (memory.status === "ativa") return "entra no contexto";
-  if (memory.status === "pendente") return "aguardando curadoria";
-
-  return "fora do contexto";
-}
-
-function contextTone(memory: MemoryWithMeta): "success" | "warn" | "muted" {
-  if (memory.status === "ativa") return "success";
-  if (memory.status === "pendente") return "warn";
-
-  return "muted";
-}
-
-function confidenceTone(memory: MemoryWithMeta): "success" | "warn" | "muted" {
-  if (memory.confidence >= 0.9) return "success";
-  if (memory.confidence >= 0.75) return "warn";
-
-  return "muted";
-}
-
-function shortDate(value?: string) {
-  if (!value) return "—";
-
-  return formatDistanceToNow(new Date(value), { addSuffix: true, locale: ptBR });
+function relativeDate(value?: string) {
+  if (!value) return "recentemente";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "recentemente";
+  return formatDistanceToNow(date, { addSuffix: true, locale: ptBR });
 }
 
 function MemoryPage() {
   const [items, setItems] = useState<MemoryWithMeta[]>([]);
-  const [tab, setTab] = useState<Tab>("todas");
-  const [q, setQ] = useState("");
-  const [editing, setEditing] = useState<MemoryItem | null>(null);
+  const [filter, setFilter] = useState<Filter>("todas");
+  const [query, setQuery] = useState("");
+  const [editing, setEditing] = useState<MemoryWithMeta | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [removeId, setRemoveId] = useState<string | null>(null);
 
@@ -93,44 +78,51 @@ function MemoryPage() {
     void refresh();
   }, []);
 
-  const stats = useMemo(() => {
-    const active = items.filter((m) => m.status === "ativa").length;
-    const pending = items.filter((m) => m.status === "pendente").length;
-    const archived = items.filter((m) => m.status === "arquivada").length;
-    const automatic = items.filter(isAutoMemory).length;
+  const stats = useMemo(
+    () => ({
+      active: items.filter((item) => item.status === "ativa").length,
+      pending: items.filter((item) => item.status === "pendente").length,
+      archived: items.filter((item) => item.status === "arquivada").length,
+    }),
+    [items],
+  );
 
-    return {
-      total: items.length,
-      active,
-      pending,
-      archived,
-      automatic,
-    };
-  }, [items]);
+  const filtered = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
 
-  const filtered = items.filter((m) => {
-    const query = q.toLowerCase().trim();
+    return items.filter((item) => {
+      if (
+        normalizedQuery &&
+        !`${item.label} ${item.content}`.toLowerCase().includes(normalizedQuery)
+      ) {
+        return false;
+      }
 
-    if (query && !(m.label.toLowerCase().includes(query) || m.content.toLowerCase().includes(query))) {
-      return false;
-    }
+      if (filter === "ativas") return item.status === "ativa";
+      if (filter === "pendentes") return item.status === "pendente";
+      if (filter === "arquivadas") return item.status === "arquivada";
+      return true;
+    });
+  }, [filter, items, query]);
 
-    if (tab === "todas") return true;
-    if (tab === "ativas") return m.status === "ativa";
-    if (tab === "pendentes") return m.status === "pendente";
-    if (tab === "automáticas") return isAutoMemory(m);
-    if (tab === "global" || tab === "projeto" || tab === "sensível") return m.scope === tab;
+  function openNewMemory() {
+    setEditing(null);
+    setDialogOpen(true);
+  }
 
-    return m.status === tab;
-  });
-
-  async function onSubmit(data: { label: string; content: string; scope: MemoryItem["scope"]; status: MemoryItem["status"]; reason?: string }) {
+  async function onSubmit(data: {
+    label: string;
+    content: string;
+    scope: MemoryItem["scope"];
+    status: MemoryItem["status"];
+    reason?: string;
+  }) {
     if (editing) {
       await memoryService.update(editing.id, data);
-      toast.success("Memória atualizada");
+      toast.success("Lembrança atualizada");
     } else {
       await memoryService.create(data);
-      toast.success("Memória criada");
+      toast.success("A orbeAI vai lembrar disso");
     }
 
     setEditing(null);
@@ -139,214 +131,325 @@ function MemoryPage() {
 
   async function onApprove(id: string) {
     await memoryService.approve(id);
-    toast.success("Memória aprovada", { description: "Ela pode entrar no contexto quando for relevante." });
+    toast.success("Pronto, a orbeAI pode lembrar disso");
     await refresh();
   }
 
   async function onReject(id: string) {
     await memoryService.reject(id);
-    toast("Memória arquivada", { description: "Ela não será usada como contexto ativo." });
+    toast("Lembrança guardada", {
+      description: "Ela continua visível, mas não será usada nas conversas.",
+    });
     await refresh();
   }
 
-  async function onExport(m: MemoryWithMeta) {
-    const txt = [
-      `# ${m.label}`,
-      "",
-      `Escopo: ${m.scope}`,
-      `Fonte: ${sourceLabel(m)}`,
-      `Status: ${m.status}`,
-      `Confiança: ${(m.confidence * 100).toFixed(0)}%`,
-      `Contexto: ${contextLabel(m)}`,
-      `Criada: ${m.createdAt ?? "—"}`,
-      `Atualizada: ${m.updatedAt ?? m.lastUsed}`,
-      "",
-      m.content,
-      "",
-    ].join("\n");
-
-    const blob = new Blob([txt], { type: "text/markdown;charset=utf-8" });
+  async function onExport(memory: MemoryWithMeta) {
+    const text = [`# ${memory.label}`, "", memory.content, ""].join("\n");
+    const blob = new Blob([text], { type: "text/markdown;charset=utf-8" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${m.label.replace(/\s+/g, "_")}.md`;
-    a.click();
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${memory.label.replace(/\s+/g, "_")}.md`;
+    anchor.click();
     URL.revokeObjectURL(url);
   }
 
   async function onRemove() {
     if (!removeId) return;
-
     await memoryService.remove(removeId);
     setRemoveId(null);
-    toast.success("Memória removida");
+    toast.success("Lembrança apagada");
     await refresh();
   }
 
   return (
-    <div className="space-y-6">
-      <SectionHeader
-        eyebrow="memory center"
-        title="Memória inteligente e governável"
-        description="A orbeAI pode lembrar sozinha, mas toda memória fica visível, editável e removível."
-        action={<Button onClick={() => { setEditing(null); setDialogOpen(true); }}><Plus className="size-4 mr-1" /> Nova memória</Button>}
-      />
-
-      <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-3">
-        <GlassCard hoverable={false}>
-          <div className="text-xs text-muted-foreground">total</div>
-          <div className="mt-1 text-2xl font-semibold tabular-nums">{stats.total}</div>
-        </GlassCard>
-        <GlassCard hoverable={false}>
-          <div className="text-xs text-muted-foreground">ativas no contexto</div>
-          <div className="mt-1 text-2xl font-semibold tabular-nums">{stats.active}</div>
-        </GlassCard>
-        <GlassCard hoverable={false}>
-          <div className="text-xs text-muted-foreground">pendentes</div>
-          <div className="mt-1 text-2xl font-semibold tabular-nums">{stats.pending}</div>
-        </GlassCard>
-        <GlassCard hoverable={false}>
-          <div className="text-xs text-muted-foreground">automáticas</div>
-          <div className="mt-1 text-2xl font-semibold tabular-nums">{stats.automatic}</div>
-        </GlassCard>
-        <GlassCard hoverable={false}>
-          <div className="text-xs text-muted-foreground">arquivadas</div>
-          <div className="mt-1 text-2xl font-semibold tabular-nums">{stats.archived}</div>
-        </GlassCard>
-      </div>
-
-      <GlassCard className="orbe-active" hoverable={false}>
-        <div className="flex items-start gap-3.5">
-          <div className="size-10 rounded-xl bg-gradient-to-br from-[var(--orbe-blue)] to-[var(--orbe-cyan)] flex items-center justify-center shrink-0 shadow-[var(--shadow-soft)]">
-            <Shield className="size-5 text-white" />
+    <div className="mx-auto w-full max-w-6xl space-y-5 pb-8">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-600">
+            o que a orbeAI lembra
           </div>
-          <div>
-            <div className="font-semibold">Política de memória</div>
-            <p className="text-sm text-muted-foreground mt-1 text-pretty">
-              Memórias explícitas entram como ativas. Memórias inferidas entram como pendentes até aprovação. Memórias arquivadas não entram no contexto.
-            </p>
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">Memória</h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+            Veja, corrija ou apague qualquer informação usada para tornar suas conversas mais pessoais.
+          </p>
+        </div>
+        <Button onClick={openNewMemory} className="rounded-xl">
+          <Plus className="mr-1.5 size-4" />
+          Adicionar lembrança
+        </Button>
+      </header>
+
+      <section className="overflow-hidden rounded-3xl border border-blue-100 bg-[linear-gradient(135deg,rgba(239,246,255,0.92),rgba(255,255,255,0.98)_52%,rgba(238,242,255,0.78))] p-5 sm:p-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex max-w-2xl items-start gap-4">
+            <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-sm">
+              <ShieldCheck className="size-5" />
+            </div>
+            <div>
+              <h2 className="font-semibold">Você escolhe o que fica</h2>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                A orbeAI pode perceber informações úteis durante uma conversa, mas sugestões novas ficam esperando sua confirmação. Nada precisa ficar escondido.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2 sm:min-w-[360px]">
+            <MemoryStat label="em uso" value={stats.active} />
+            <MemoryStat label="confirmar" value={stats.pending} highlight={stats.pending > 0} />
+            <MemoryStat label="guardadas" value={stats.archived} />
           </div>
         </div>
-      </GlassCard>
+      </section>
 
-      <div className="flex flex-col md:flex-row gap-3 md:items-center">
-        <div className="flex flex-wrap gap-1 p-1 rounded-xl orbe-surface">
-          {TABS.map((t) => (
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex w-fit max-w-full gap-1 overflow-x-auto rounded-xl border border-border/70 bg-card p-1">
+          {FILTERS.map((item) => (
             <button
-              key={t}
-              onClick={() => setTab(t)}
+              key={item.key}
+              type="button"
+              onClick={() => setFilter(item.key)}
               className={cn(
-                "px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-colors",
-                tab === t ? "bg-card text-foreground shadow-[var(--shadow-xs)]" : "text-muted-foreground hover:text-foreground",
+                "whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition",
+                filter === item.key
+                  ? "bg-slate-950 text-white shadow-sm"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
               )}
             >
-              {t}
+              {item.label}
+              {item.key === "pendentes" && stats.pending > 0 && (
+                <span className="ml-1.5 rounded-full bg-white/20 px-1.5 py-0.5 text-[10px]">
+                  {stats.pending}
+                </span>
+              )}
             </button>
           ))}
         </div>
-        <div className="relative md:ml-auto md:w-80">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
-          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar memórias…" className="pl-9 h-9" />
+
+        <div className="relative w-full sm:w-72">
+          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Buscar nas lembranças"
+            className="h-9 rounded-xl pl-9"
+          />
         </div>
       </div>
 
       {filtered.length === 0 ? (
-        <EmptyState
-          icon={<Brain className="size-6" />}
-          title="Nenhuma memória neste filtro"
-          description="Crie uma nova memória manual ou ajuste os filtros."
-          action={<Button onClick={() => { setEditing(null); setDialogOpen(true); }}><Plus className="size-4 mr-1" /> Nova memória</Button>}
-        />
+        <section className="flex min-h-64 flex-col items-center justify-center rounded-3xl border border-dashed border-border bg-card px-6 text-center">
+          <div className="flex size-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+            <Brain className="size-6" />
+          </div>
+          <h2 className="mt-4 font-semibold">Nada por aqui</h2>
+          <p className="mt-1 max-w-sm text-sm leading-6 text-muted-foreground">
+            Tente outro filtro ou adicione algo que você gostaria que a orbeAI lembrasse.
+          </p>
+          <Button variant="outline" className="mt-4 rounded-xl" onClick={openNewMemory}>
+            <Plus className="mr-1.5 size-4" />
+            Adicionar lembrança
+          </Button>
+        </section>
       ) : (
-        <div className="grid md:grid-cols-2 gap-3">
-          {filtered.map((m) => (
-            <GlassCard key={m.id} className={cn(m.scope === "sensível" && "border-[var(--warning)]/40")}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    {isAutoMemory(m) ? (
-                      <Sparkles className="size-4 text-[var(--orbe-blue)]" />
-                    ) : (
-                      <Brain className="size-4 text-[var(--orbe-blue)]" />
-                    )}
-                    <span className="font-medium text-sm truncate">{m.label}</span>
-                  </div>
-
-                  <p className="text-xs text-muted-foreground mt-2 line-clamp-3">{m.content}</p>
-
-                  {m.reason && (
-                    <p className="text-[11px] italic text-muted-foreground mt-1">motivo: {m.reason}</p>
-                  )}
-
-                  <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
-                    <Pill tone={m.scope === "sensível" ? "warn" : m.scope === "global" ? "blue" : "muted"}>{m.scope}</Pill>
-                    <Pill tone="muted">origem: {sourceLabel(m)}</Pill>
-                    <Pill tone={confidenceTone(m)}>conf. {(m.confidence * 100).toFixed(0)}%</Pill>
-                    <Pill tone={m.status === "ativa" ? "success" : m.status === "pendente" ? "warn" : "muted"}>{m.status}</Pill>
-                    <Pill tone={contextTone(m)}>{contextLabel(m)}</Pill>
-                  </div>
-
-                  <div className="mt-3 grid sm:grid-cols-2 gap-1 text-[11px] text-muted-foreground">
-                    <div className="inline-flex items-center gap-1">
-                      <Clock className="size-3" />
-                      criada {shortDate(m.createdAt)}
-                    </div>
-                    <div className="inline-flex items-center gap-1">
-                      <Archive className="size-3" />
-                      atualizada {shortDate(m.updatedAt ?? m.lastUsed)}
-                    </div>
-                  </div>
-
-                  {m.sourceEntityId && (
-                    <div className="mt-1 text-[10px] text-muted-foreground/70 truncate">
-                      origem técnica: {m.sourceEntityId}
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex flex-col gap-1">
-                  {m.status === "pendente" && (
-                    <>
-                      <Button size="icon" variant="ghost" onClick={() => onApprove(m.id)} title="Aprovar">
-                        <Check className="size-3.5 text-[var(--success)]" />
-                      </Button>
-                      <Button size="icon" variant="ghost" onClick={() => onReject(m.id)} title="Arquivar">
-                        <X className="size-3.5" />
-                      </Button>
-                    </>
-                  )}
-                  <Button size="icon" variant="ghost" onClick={() => { setEditing(m); setDialogOpen(true); }} title="Editar">
-                    <Pencil className="size-3.5" />
-                  </Button>
-                  <Button size="icon" variant="ghost" onClick={() => onExport(m)} title="Exportar">
-                    <Download className="size-3.5" />
-                  </Button>
-                  <Button size="icon" variant="ghost" onClick={() => setRemoveId(m.id)} title="Remover">
-                    <Trash2 className="size-3.5" />
-                  </Button>
-                </div>
-              </div>
-            </GlassCard>
+        <div className="grid gap-3 md:grid-cols-2">
+          {filtered.map((memory) => (
+            <MemoryCard
+              key={memory.id}
+              memory={memory}
+              onApprove={() => void onApprove(memory.id)}
+              onReject={() => void onReject(memory.id)}
+              onEdit={() => {
+                setEditing(memory);
+                setDialogOpen(true);
+              }}
+              onExport={() => void onExport(memory)}
+              onRemove={() => setRemoveId(memory.id)}
+            />
           ))}
         </div>
       )}
 
       <MemoryDialog
         open={dialogOpen}
-        onOpenChange={setDialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) setEditing(null);
+        }}
         initial={editing ?? undefined}
         onSubmit={onSubmit}
       />
 
       <ConfirmDialog
-        open={!!removeId}
-        onOpenChange={(v) => !v && setRemoveId(null)}
-        title="Remover memória?"
-        description="Esta ação não pode ser desfeita."
-        confirmLabel="Remover"
+        open={Boolean(removeId)}
+        onOpenChange={(open) => !open && setRemoveId(null)}
+        title="Apagar esta lembrança?"
+        description="A orbeAI deixará de usar essa informação e ela não poderá ser recuperada."
+        confirmLabel="Apagar"
         destructive
         onConfirm={onRemove}
       />
     </div>
+  );
+}
+
+function MemoryStat({
+  label,
+  value,
+  highlight = false,
+}: {
+  label: string;
+  value: number;
+  highlight?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        "rounded-2xl border bg-white/75 px-3 py-3 text-center shadow-sm",
+        highlight ? "border-amber-200" : "border-white/80",
+      )}
+    >
+      <div className="text-xl font-semibold tabular-nums">{value}</div>
+      <div className="mt-0.5 text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
+        {label}
+      </div>
+    </div>
+  );
+}
+
+function MemoryCard({
+  memory,
+  onApprove,
+  onReject,
+  onEdit,
+  onExport,
+  onRemove,
+}: {
+  memory: MemoryWithMeta;
+  onApprove: () => void;
+  onReject: () => void;
+  onEdit: () => void;
+  onExport: () => void;
+  onRemove: () => void;
+}) {
+  const pending = memory.status === "pendente";
+  const archived = memory.status === "arquivada";
+
+  const scope =
+    memory.scope === "global"
+      ? { label: "Em qualquer conversa", icon: Globe2 }
+      : memory.scope === "sensível"
+        ? { label: "Informação sensível", icon: LockKeyhole }
+        : { label: "Só neste projeto", icon: Folder };
+
+  const ScopeIcon = scope.icon;
+
+  return (
+    <article
+      className={cn(
+        "group flex min-h-56 flex-col rounded-2xl border bg-card p-4 shadow-[0_12px_35px_-30px_rgba(15,23,42,0.55)] transition",
+        pending && "border-amber-200 bg-amber-50/30",
+        archived && "opacity-75",
+        memory.scope === "sensível" && !pending && "border-violet-200/80",
+      )}
+    >
+      <div className="flex items-start gap-3">
+        <div
+          className={cn(
+            "flex size-9 shrink-0 items-center justify-center rounded-xl",
+            pending
+              ? "bg-amber-100 text-amber-700"
+              : archived
+                ? "bg-muted text-muted-foreground"
+                : "bg-blue-50 text-blue-600",
+          )}
+        >
+          {isAutomatic(memory) ? <Sparkles className="size-4" /> : <Brain className="size-4" />}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <h2 className="truncate text-sm font-semibold">{memory.label}</h2>
+            <span
+              className={cn(
+                "shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold",
+                pending && "bg-amber-100 text-amber-700",
+                memory.status === "ativa" && "bg-emerald-50 text-emerald-700",
+                archived && "bg-muted text-muted-foreground",
+              )}
+            >
+              {pending ? "confirmar" : archived ? "guardada" : "em uso"}
+            </span>
+          </div>
+          <p className="mt-2 line-clamp-4 text-sm leading-6 text-muted-foreground">
+            {memory.content}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-auto pt-4">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5">
+            <ScopeIcon className="size-3.5" />
+            {scope.label}
+          </span>
+          <span>•</span>
+          <span>{memoryOrigin(memory)}</span>
+          <span>•</span>
+          <span>{relativeDate(memory.updatedAt ?? memory.createdAt ?? memory.lastUsed)}</span>
+        </div>
+
+        {pending ? (
+          <div className="mt-4 flex gap-2 border-t border-amber-200/70 pt-3">
+            <Button size="sm" className="h-8 flex-1 rounded-lg" onClick={onApprove}>
+              <Check className="mr-1.5 size-3.5" />
+              Lembrar disso
+            </Button>
+            <Button size="sm" variant="outline" className="h-8 flex-1 rounded-lg" onClick={onReject}>
+              <X className="mr-1.5 size-3.5" />
+              Não usar
+            </Button>
+          </div>
+        ) : (
+          <div className="mt-3 flex items-center justify-end gap-0.5 border-t border-border/60 pt-2">
+            {archived && (
+              <span className="mr-auto inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                <Archive className="size-3" /> não entra nas conversas
+              </span>
+            )}
+            <IconAction label="Editar" onClick={onEdit} icon={Pencil} />
+            <IconAction label="Baixar" onClick={onExport} icon={Download} />
+            <IconAction label="Apagar" onClick={onRemove} icon={Trash2} destructive />
+          </div>
+        )}
+      </div>
+    </article>
+  );
+}
+
+function IconAction({
+  label,
+  onClick,
+  icon: Icon,
+  destructive = false,
+}: {
+  label: string;
+  onClick: () => void;
+  icon: typeof Pencil;
+  destructive?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+      className={cn(
+        "flex size-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground",
+        destructive && "hover:bg-red-50 hover:text-red-600",
+      )}
+    >
+      <Icon className="size-3.5" />
+    </button>
   );
 }
