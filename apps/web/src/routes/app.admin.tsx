@@ -1,61 +1,83 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { GlassCard, Pill, SectionHeader, StatCard, StatusDot } from "@/components/design-system/Primitives";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Switch } from "@/components/ui/switch";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ConfirmDialog } from "@/components/common/ConfirmDialog";
-import { adminService } from "@/lib/api";
-import { localStore } from "@/lib/storage/localStore";
-import type { AuditLog, FeatureFlag, UsageMetric, WorkspaceInfo } from "@/types";
 import {
   Activity,
   AlertTriangle,
   Brain,
-  Clock,
+  CheckCircle2,
+  Clock3,
   Database,
+  Download,
+  EyeOff,
   FileText,
   Globe2,
-  Save,
-  Settings,
+  History,
+  KeyRound,
   RefreshCw,
-  Route as RouteIcon,
+  Save,
+  ServerCog,
+  Settings2,
   ShieldCheck,
+  SlidersHorizontal,
+  Sparkles,
   Trash2,
+  WalletCards,
   Zap,
 } from "lucide-react";
 import { toast } from "sonner";
+
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { GlassCard, Pill, StatusDot } from "@/components/design-system/Primitives";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { adminService } from "@/lib/api";
+import { localStore } from "@/lib/storage/localStore";
 import { cn } from "@/lib/utils";
+import type { AuditLog, FeatureFlag, UsageMetric, WorkspaceInfo } from "@/types";
 
 export const Route = createFileRoute("/app/admin")({
-  head: () => ({ meta: [{ title: "Admin · orbeAI" }] }),
+  head: () => ({ meta: [{ title: "Administração · orbeAI" }] }),
   component: AdminPage,
 });
 
 function formatCost(value: number) {
-  if (!Number.isFinite(value) || value === 0) return "$0.000000";
-  if (Math.abs(value) < 0.01) return `$${value.toFixed(6)}`;
-
-  return `$${value.toFixed(4)}`;
+  if (!Number.isFinite(value) || value === 0) return "US$ 0,00";
+  if (Math.abs(value) < 0.01) return `US$ ${value.toFixed(4).replace(".", ",")}`;
+  return `US$ ${value.toFixed(2).replace(".", ",")}`;
 }
 
 function formatDate(value: string) {
   return new Date(value).toLocaleString("pt-BR", {
     day: "2-digit",
-    month: "2-digit",
+    month: "short",
     hour: "2-digit",
     minute: "2-digit",
   });
 }
 
+function humanAction(action: string) {
+  const normalized = action.toLowerCase();
+
+  if (normalized.includes("memory") && normalized.includes("remove")) return "Lembrança removida";
+  if (normalized.includes("memory") && normalized.includes("create")) return "Nova lembrança guardada";
+  if (normalized.includes("artifact") && normalized.includes("remove")) return "Item removido da Biblioteca";
+  if (normalized.includes("artifact") && normalized.includes("version")) return "Nova versão salva na Biblioteca";
+  if (normalized.includes("artifact") && normalized.includes("create")) return "Novo item criado na Biblioteca";
+  if (normalized.includes("chat") && normalized.includes("create")) return "Nova conversa iniciada";
+  if (normalized.includes("project") && normalized.includes("create")) return "Novo projeto criado";
+  if (normalized.includes("error")) return "Falha registrada pelo sistema";
+
+  return action.replaceAll(".", " · ").replaceAll("_", " ");
+}
+
 function actionIcon(action: string) {
   if (action.startsWith("memory")) return Brain;
   if (action.startsWith("artifact")) return FileText;
-  if (action.startsWith("chat")) return RouteIcon;
-  if (action.includes("delete")) return Trash2;
-
+  if (action.startsWith("chat")) return Sparkles;
+  if (action.includes("delete") || action.includes("remove")) return Trash2;
   return Activity;
 }
 
@@ -63,13 +85,24 @@ function actionTone(log: AuditLog): "success" | "warn" | "danger" | "muted" | "b
   if (log.level === "error") return "danger";
   if (log.level === "warn") return "warn";
   if (log.action.startsWith("memory")) return "blue";
-  if (log.action.startsWith("artifact")) return "muted";
   if (log.action.startsWith("chat")) return "success";
-
   return "muted";
 }
 
+function audienceLabel(audience: FeatureFlag["audience"]) {
+  if (audience === "todos") return "Disponível para todos";
+  if (audience === "beta") return "Grupo de testes";
+  return "Somente equipe interna";
+}
+
+function memoryPolicyLabel(policy: string) {
+  if (policy === "strict") return "Sempre confirmar";
+  if (policy === "adaptive") return "Aprender com mais liberdade";
+  return "Equilibrada";
+}
+
 function AdminPage() {
+  const [tab, setTab] = useState("overview");
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [usage, setUsage] = useState<UsageMetric[]>([]);
   const [flags, setFlags] = useState<FeatureFlag[]>([]);
@@ -83,7 +116,7 @@ function AdminPage() {
   const [dataRetentionDays, setDataRetentionDays] = useState("365");
   const [allowExports, setAllowExports] = useState(true);
   const [allowPublicSharing, setAllowPublicSharing] = useState(false);
-  const [q, setQ] = useState("");
+  const [query, setQuery] = useState("");
   const [level, setLevel] = useState<AuditLog["level"] | "todos">("todos");
   const [resetOpen, setResetOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -92,26 +125,26 @@ function AdminPage() {
     setLoading(true);
 
     try {
-      const [a, u, f, w] = await Promise.all([
-        adminService.audit({ q: q || undefined, level: level === "todos" ? undefined : level }),
+      const [nextLogs, nextUsage, nextFlags, nextWorkspace] = await Promise.all([
+        adminService.audit({ q: query || undefined, level: level === "todos" ? undefined : level }),
         adminService.usage(),
         adminService.flags(),
         adminService.workspace(),
       ]);
 
-      setLogs(a);
-      setUsage(u);
-      setFlags(f);
-      setWorkspace(w);
-      setWorkspaceName(w.name);
-      setWorkspacePlan(w.plan);
-      setWorkspaceTimezone(w.settings.timezone);
-      setDefaultChatMode(w.settings.defaultChatMode);
-      setDefaultModelPreference(w.settings.defaultModelPreference);
-      setMemoryPolicy(w.settings.memoryPolicy);
-      setDataRetentionDays(String(w.settings.dataRetentionDays));
-      setAllowExports(w.settings.allowExports);
-      setAllowPublicSharing(w.settings.allowPublicSharing);
+      setLogs(nextLogs);
+      setUsage(nextUsage);
+      setFlags(nextFlags);
+      setWorkspace(nextWorkspace);
+      setWorkspaceName(nextWorkspace.name);
+      setWorkspacePlan(nextWorkspace.plan);
+      setWorkspaceTimezone(nextWorkspace.settings.timezone);
+      setDefaultChatMode(nextWorkspace.settings.defaultChatMode);
+      setDefaultModelPreference(nextWorkspace.settings.defaultModelPreference);
+      setMemoryPolicy(nextWorkspace.settings.memoryPolicy);
+      setDataRetentionDays(String(nextWorkspace.settings.dataRetentionDays));
+      setAllowExports(nextWorkspace.settings.allowExports);
+      setAllowPublicSharing(nextWorkspace.settings.allowPublicSharing);
     } finally {
       setLoading(false);
     }
@@ -119,22 +152,20 @@ function AdminPage() {
 
   useEffect(() => {
     void refresh();
-  }, [q, level]);
+  }, [query, level]);
 
   const totals = useMemo(() => {
-    const totalTokens = usage.reduce((s, u) => s + u.tokens, 0);
-    const totalCost = usage.reduce((s, u) => s + u.costUsd, 0);
-    const totalRequests = usage.reduce((s, u) => s + u.requests, 0);
-    const warnEvents = logs.filter((l) => l.level === "warn").length;
-    const errorEvents = logs.filter((l) => l.level === "error").length;
-    const criticalEvents = warnEvents + errorEvents;
+    const requests = usage.reduce((sum, item) => sum + item.requests, 0);
+    const tokens = usage.reduce((sum, item) => sum + item.tokens, 0);
+    const costUsd = usage.reduce((sum, item) => sum + item.costUsd, 0);
+    const alerts = logs.filter((item) => item.level === "warn" || item.level === "error").length;
 
     return {
-      totalTokens,
-      totalCost,
-      totalRequests,
-      criticalEvents,
-      activeFlags: flags.filter((f) => f.enabled).length,
+      requests,
+      tokens,
+      costUsd,
+      alerts,
+      activeFlags: flags.filter((item) => item.enabled).length,
     };
   }, [usage, logs, flags]);
 
@@ -142,7 +173,7 @@ function AdminPage() {
     const buckets = new Map<string, number>();
 
     for (const log of logs) {
-      const key = log.resourceType ?? log.action.split(".")[0] ?? "system";
+      const key = log.resourceType ?? log.action.split(".")[0] ?? "sistema";
       buckets.set(key, (buckets.get(key) ?? 0) + 1);
     }
 
@@ -151,7 +182,7 @@ function AdminPage() {
       .sort((a, b) => b.count - a.count);
   }, [logs]);
 
-  const providerUsage = useMemo(() => {
+  const engineUsage = useMemo(() => {
     const buckets = new Map<string, { tokens: number; requests: number; costUsd: number }>();
 
     for (const item of usage) {
@@ -162,12 +193,14 @@ function AdminPage() {
       buckets.set(item.provider, current);
     }
 
-    return Array.from(buckets.entries()).map(([provider, data]) => ({ provider, ...data }));
+    return Array.from(buckets.entries())
+      .map(([provider, data]) => ({ provider, ...data }))
+      .sort((a, b) => b.requests - a.requests);
   }, [usage]);
 
   async function onToggleFlag(key: string) {
     await adminService.toggleFlag(key);
-    toast.success("Flag atualizada");
+    toast.success("Disponibilidade atualizada");
     await refresh();
   }
 
@@ -175,7 +208,7 @@ function AdminPage() {
     const retention = Number(dataRetentionDays);
 
     if (!Number.isFinite(retention) || retention < 1) {
-      toast.error("Retenção de dados inválida");
+      toast.error("Informe um prazo válido para guardar os dados");
       return;
     }
 
@@ -194,112 +227,396 @@ function AdminPage() {
       allowPublicSharing,
     });
 
-    setWorkspace({
-      ...updatedWorkspace,
-      settings: updatedSettings,
-    });
-
-    toast.success("Workspace atualizado");
+    setWorkspace({ ...updatedWorkspace, settings: updatedSettings });
+    toast.success("Preferências salvas");
     await refresh();
   }
 
   function onReset() {
     localStore.resetDemoData();
-    toast.success("Dados locais de demonstração resetados");
+    toast.success("Dados da prévia restaurados");
     setResetOpen(false);
     void refresh();
   }
 
+  const protectedEnvironment = !allowPublicSharing;
+
   return (
-    <div className="space-y-6">
-      <SectionHeader
-        eyebrow="admin cockpit"
-        title="Torre de controle da orbeAI"
-        description="Auditoria, uso de modelos, eventos críticos e saúde operacional do workspace."
-        action={
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => void refresh()} disabled={loading}>
-              <RefreshCw className={cn("size-4 mr-1", loading && "animate-spin")} />
-              Atualizar
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setResetOpen(true)}>
-              Reset local
+    <div className="mx-auto w-full max-w-[1380px] space-y-6">
+      <section className="overflow-hidden rounded-[1.75rem] border border-border/70 bg-[linear-gradient(135deg,rgba(239,246,255,0.96),rgba(255,255,255,0.98)_54%,rgba(236,254,255,0.74))] p-6 shadow-[0_24px_70px_-55px_rgba(15,23,42,0.65)] md:p-8">
+        <div className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-center">
+          <div>
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-blue-200/70 bg-white/70 px-3 py-1.5 text-xs font-medium text-blue-700">
+              <ShieldCheck className="size-3.5" />
+              controle e proteção
+            </div>
+            <h1 className="max-w-3xl text-3xl font-semibold tracking-[-0.035em] text-balance md:text-4xl">
+              Administração sem labirinto.
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground md:text-base">
+              Acompanhe o ambiente, proteja os dados e ajuste as regras gerais da orbeAI em um só lugar.
+            </p>
+
+            <div className="mt-6 flex flex-wrap gap-2">
+              <Pill tone={protectedEnvironment ? "success" : "warn"}>
+                {protectedEnvironment ? "acesso protegido" : "links públicos permitidos"}
+              </Pill>
+              <Pill tone="blue">memória {memoryPolicyLabel(memoryPolicy).toLowerCase()}</Pill>
+              <Pill tone="muted">dados guardados por {dataRetentionDays} dias</Pill>
+            </div>
+          </div>
+
+          <div className="rounded-[1.4rem] border border-white/80 bg-white/72 p-5 shadow-sm backdrop-blur">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">estado geral</div>
+                <div className="mt-1 text-lg font-semibold">Tudo em ordem</div>
+              </div>
+              <span className="flex size-11 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
+                <CheckCircle2 className="size-5" />
+              </span>
+            </div>
+
+            <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
+              <div className="rounded-xl bg-muted/45 p-3">
+                <div className="text-xs text-muted-foreground">atividade</div>
+                <div className="mt-1 font-semibold tabular-nums">{totals.requests} ações</div>
+              </div>
+              <div className="rounded-xl bg-muted/45 p-3">
+                <div className="text-xs text-muted-foreground">alertas</div>
+                <div className="mt-1 font-semibold tabular-nums">{totals.alerts}</div>
+              </div>
+            </div>
+
+            <Button variant="outline" className="mt-4 w-full" onClick={() => void refresh()} disabled={loading}>
+              <RefreshCw className={cn("mr-2 size-4", loading && "animate-spin")} />
+              Atualizar informações
             </Button>
           </div>
-        }
-      />
+        </div>
+      </section>
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-3">
-        <StatCard icon={Activity} label="Requisições" value={totals.totalRequests.toString()} hint="model_runs" />
-        <StatCard icon={Zap} label="Tokens" value={totals.totalTokens.toLocaleString("pt-BR")} hint="todos os providers" />
-        <StatCard icon={ShieldCheck} label="Audit logs" value={logs.length.toString()} hint="backend real" />
-        <StatCard icon={AlertTriangle} label="Eventos críticos" value={totals.criticalEvents.toString()} hint="warn + error" />
-        <StatCard icon={Database} label="Custo estimado" value={formatCost(totals.totalCost)} hint="provider pricing" />
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {[
+          {
+            icon: ShieldCheck,
+            label: "Proteção",
+            value: protectedEnvironment ? "Ativa" : "Revisar",
+            detail: protectedEnvironment ? "sem compartilhamento público" : "links públicos liberados",
+            tone: protectedEnvironment ? "text-emerald-600 bg-emerald-50" : "text-amber-600 bg-amber-50",
+          },
+          {
+            icon: Activity,
+            label: "Atividade recente",
+            value: logs.length.toString(),
+            detail: "acontecimentos registrados",
+            tone: "text-blue-600 bg-blue-50",
+          },
+          {
+            icon: WalletCards,
+            label: "Consumo estimado",
+            value: formatCost(totals.costUsd),
+            detail: `${totals.requests} solicitações processadas`,
+            tone: "text-violet-600 bg-violet-50",
+          },
+          {
+            icon: Sparkles,
+            label: "Recursos em teste",
+            value: totals.activeFlags.toString(),
+            detail: "ativos neste ambiente",
+            tone: "text-cyan-600 bg-cyan-50",
+          },
+        ].map((item) => {
+          const Icon = item.icon;
+          return (
+            <div key={item.label} className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
+              <div className="flex items-start gap-3">
+                <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-xl", item.tone)}>
+                  <Icon className="size-4" />
+                </span>
+                <div className="min-w-0">
+                  <div className="text-xs text-muted-foreground">{item.label}</div>
+                  <div className="mt-0.5 text-xl font-semibold tracking-tight tabular-nums">{item.value}</div>
+                  <div className="mt-1 text-xs text-muted-foreground">{item.detail}</div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
-      <Tabs defaultValue="audit">
-        <TabsList className="flex flex-wrap">
-          <TabsTrigger value="audit">Auditoria</TabsTrigger>
-          <TabsTrigger value="usage">Uso de modelos</TabsTrigger>
-          <TabsTrigger value="events">Eventos</TabsTrigger>
-          <TabsTrigger value="flags">Feature flags</TabsTrigger>
-          <TabsTrigger value="workspace">Workspace</TabsTrigger>
-          <TabsTrigger value="health">Saúde do sistema</TabsTrigger>
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-2xl border border-border/70 bg-card p-1.5">
+          <TabsTrigger value="overview" className="rounded-xl">Visão geral</TabsTrigger>
+          <TabsTrigger value="preferences" className="rounded-xl">Segurança e preferências</TabsTrigger>
+          <TabsTrigger value="activity" className="rounded-xl">Atividade</TabsTrigger>
+          <TabsTrigger value="usage" className="rounded-xl">Consumo</TabsTrigger>
+          <TabsTrigger value="features" className="rounded-xl">Recursos em teste</TabsTrigger>
+          <TabsTrigger value="system" className="rounded-xl">Sistema</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="audit" className="mt-5 space-y-3">
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Input
-              placeholder="Buscar ação, recurso, produto…"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              className="sm:max-w-xs"
-            />
-            <Select value={level} onValueChange={(v) => setLevel(v as AuditLog["level"] | "todos")}>
-              <SelectTrigger className="sm:w-[160px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">todos</SelectItem>
-                <SelectItem value="info">info</SelectItem>
-                <SelectItem value="warn">warn</SelectItem>
-                <SelectItem value="error">error</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        <TabsContent value="overview" className="mt-5 space-y-4">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.75fr)]">
+            <GlassCard hoverable={false} className="p-0 overflow-hidden">
+              <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
+                <div>
+                  <h2 className="font-semibold">O que aconteceu recentemente</h2>
+                  <p className="mt-1 text-xs text-muted-foreground">Uma leitura simples das últimas mudanças no ambiente.</p>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => setTab("activity")}>Ver tudo</Button>
+              </div>
 
-          <GlassCard hoverable={false}>
-            {logs.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Nenhum evento encontrado.</p>
-            ) : (
-              <ul className="divide-y divide-border/60">
-                {logs.map((log) => {
-                  const Icon = actionIcon(log.action);
-
-                  return (
-                    <li key={log.id} className="py-3 first:pt-0 last:pb-0">
-                      <div className="flex items-start gap-3 text-sm">
-                        <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted/50">
+              {logs.length === 0 ? (
+                <div className="p-8 text-sm text-muted-foreground">Nenhuma atividade registrada ainda.</div>
+              ) : (
+                <ul className="divide-y divide-border/60 px-5">
+                  {logs.slice(0, 6).map((log) => {
+                    const Icon = actionIcon(log.action);
+                    return (
+                      <li key={log.id} className="flex items-start gap-3 py-3.5">
+                        <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl bg-muted/55">
                           <Icon className="size-4 text-[var(--orbe-blue)]" />
                         </span>
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            <Pill tone={actionTone(log)}>{log.level}</Pill>
-                            <span className="font-medium">{log.action}</span>
-                            {log.resourceType && <Pill tone="muted">{log.resourceType}</Pill>}
-                            {log.product && <span className="text-xs text-muted-foreground">{log.product}</span>}
+                            <span className="text-sm font-medium">{humanAction(log.action)}</span>
+                            {log.level !== "info" && <Pill tone={actionTone(log)}>{log.level === "error" ? "atenção" : "revisar"}</Pill>}
                           </div>
-                          <div className="mt-1 text-xs text-muted-foreground break-all">
-                            alvo: {log.target}
-                          </div>
-                          {log.meta && (
-                            <div className="mt-1 text-[11px] text-muted-foreground line-clamp-1">
-                              meta: {Object.keys(log.meta).slice(0, 6).join(", ") || "—"}
-                            </div>
-                          )}
+                          <div className="mt-1 truncate text-xs text-muted-foreground">{log.target}</div>
                         </div>
-                        <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                          {formatDate(log.at)}
-                        </span>
+                        <span className="shrink-0 text-[11px] text-muted-foreground">{formatDate(log.at)}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </GlassCard>
+
+            <div className="space-y-4">
+              <GlassCard hoverable={false}>
+                <div className="flex items-center gap-2">
+                  <Globe2 className="size-4 text-[var(--orbe-blue)]" />
+                  <h2 className="font-semibold">Este ambiente</h2>
+                </div>
+                <dl className="mt-4 space-y-3 text-sm">
+                  <div className="flex items-center justify-between gap-4">
+                    <dt className="text-muted-foreground">Nome</dt>
+                    <dd className="font-medium">{workspace?.name ?? "orbeAI"}</dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <dt className="text-muted-foreground">Plano</dt>
+                    <dd className="font-medium capitalize">{workspace?.plan ?? "—"}</dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <dt className="text-muted-foreground">Fuso horário</dt>
+                    <dd className="text-right text-xs font-medium">{workspace?.settings.timezone ?? "—"}</dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <dt className="text-muted-foreground">Exportações</dt>
+                    <dd><Pill tone={allowExports ? "success" : "muted"}>{allowExports ? "permitidas" : "bloqueadas"}</Pill></dd>
+                  </div>
+                </dl>
+                <Button variant="outline" className="mt-5 w-full" onClick={() => setTab("preferences")}>
+                  Ajustar preferências
+                </Button>
+              </GlassCard>
+
+              <GlassCard hoverable={false}>
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="size-4 text-amber-500" />
+                  <h2 className="font-semibold">Pontos para acompanhar</h2>
+                </div>
+                <div className="mt-4 space-y-3 text-sm">
+                  <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/45 p-3">
+                    <span>Alertas recentes</span>
+                    <strong className="tabular-nums">{totals.alerts}</strong>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/45 p-3">
+                    <span>Recursos experimentais</span>
+                    <strong className="tabular-nums">{totals.activeFlags}</strong>
+                  </div>
+                </div>
+              </GlassCard>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="preferences" className="mt-5 space-y-4">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
+            <GlassCard hoverable={false}>
+              <div className="flex items-start gap-3">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+                  <Settings2 className="size-4" />
+                </span>
+                <div>
+                  <h2 className="font-semibold">Identidade e funcionamento</h2>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">Preferências gerais que valem para este ambiente inteiro.</p>
+                </div>
+              </div>
+
+              <div className="mt-5 grid gap-4 md:grid-cols-2">
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">Nome do ambiente</span>
+                  <Input value={workspaceName} onChange={(event) => setWorkspaceName(event.target.value)} />
+                </label>
+
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">Plano</span>
+                  <Input value={workspacePlan} onChange={(event) => setWorkspacePlan(event.target.value)} />
+                </label>
+
+                <label className="space-y-1.5 md:col-span-2">
+                  <span className="text-xs font-medium text-muted-foreground">Fuso horário</span>
+                  <Input value={workspaceTimezone} onChange={(event) => setWorkspaceTimezone(event.target.value)} />
+                </label>
+              </div>
+
+              <details className="mt-5 rounded-2xl border border-border/60 bg-muted/20 p-4">
+                <summary className="cursor-pointer text-sm font-medium">Preferências avançadas das conversas</summary>
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                  Normalmente a orbeAI escolhe tudo sozinha. Estas opções definem apenas o ponto de partida do ambiente.
+                </p>
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  <label className="space-y-1.5">
+                    <span className="text-xs text-muted-foreground">Estilo inicial</span>
+                    <Select value={defaultChatMode} onValueChange={setDefaultChatMode}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="strategist">Planejar e organizar</SelectItem>
+                        <SelectItem value="dev">Tecnologia e código</SelectItem>
+                        <SelectItem value="document">Ler documentos</SelectItem>
+                        <SelectItem value="research">Pesquisar assuntos</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </label>
+
+                  <label className="space-y-1.5">
+                    <span className="text-xs text-muted-foreground">Escolha dos motores</span>
+                    <Select value={defaultModelPreference} onValueChange={setDefaultModelPreference}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="auto">Automática</SelectItem>
+                        <SelectItem value="openai">OpenAI</SelectItem>
+                        <SelectItem value="gemini">Gemini</SelectItem>
+                        <SelectItem value="mock">Prévia local</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </label>
+                </div>
+              </details>
+            </GlassCard>
+
+            <GlassCard hoverable={false}>
+              <div className="flex items-start gap-3">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
+                  <KeyRound className="size-4" />
+                </span>
+                <div>
+                  <h2 className="font-semibold">Dados e permissões</h2>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">Escolha o que pode sair do ambiente e por quanto tempo as informações ficam guardadas.</p>
+                </div>
+              </div>
+
+              <div className="mt-5 space-y-4">
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">Como a memória deve aprender</span>
+                  <Select value={memoryPolicy} onValueChange={setMemoryPolicy}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="strict">Sempre pedir confirmação</SelectItem>
+                      <SelectItem value="balanced">Equilibrar ajuda e controle</SelectItem>
+                      <SelectItem value="adaptive">Aprender com mais liberdade</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </label>
+
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">Por quanto tempo guardar os dados</span>
+                  <div className="relative">
+                    <Input value={dataRetentionDays} onChange={(event) => setDataRetentionDays(event.target.value)} inputMode="numeric" className="pr-14" />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">dias</span>
+                  </div>
+                </label>
+
+                <div className="rounded-2xl border border-border/60">
+                  <div className="flex items-center justify-between gap-4 p-4">
+                    <div>
+                      <div className="flex items-center gap-2 text-sm font-medium"><Download className="size-4 text-muted-foreground" /> Permitir exportações</div>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">Autoriza baixar itens e resultados criados.</p>
+                    </div>
+                    <Switch checked={allowExports} onCheckedChange={setAllowExports} />
+                  </div>
+                  <div className="border-t border-border/60" />
+                  <div className="flex items-center justify-between gap-4 p-4">
+                    <div>
+                      <div className="flex items-center gap-2 text-sm font-medium"><Globe2 className="size-4 text-muted-foreground" /> Links públicos</div>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">Permite compartilhar conteúdo sem exigir acesso ao ambiente.</p>
+                    </div>
+                    <Switch checked={allowPublicSharing} onCheckedChange={setAllowPublicSharing} />
+                  </div>
+                </div>
+              </div>
+            </GlassCard>
+          </div>
+
+          <div className="flex justify-end">
+            <Button onClick={onSaveWorkspace}>
+              <Save className="mr-2 size-4" />
+              Salvar preferências
+            </Button>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="activity" className="mt-5 space-y-4">
+          <div className="flex flex-col gap-3 rounded-2xl border border-border/70 bg-card p-4 sm:flex-row sm:items-center">
+            <div className="relative flex-1">
+              <History className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Buscar uma mudança ou item…"
+                className="pl-9"
+              />
+            </div>
+            <Select value={level} onValueChange={(value) => setLevel(value as AuditLog["level"] | "todos")}>
+              <SelectTrigger className="sm:w-[190px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Tudo</SelectItem>
+                <SelectItem value="info">Atividade comum</SelectItem>
+                <SelectItem value="warn">Precisa de revisão</SelectItem>
+                <SelectItem value="error">Falhas</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <GlassCard hoverable={false} className="p-0 overflow-hidden">
+            {logs.length === 0 ? (
+              <div className="p-8 text-sm text-muted-foreground">Nenhum acontecimento encontrado.</div>
+            ) : (
+              <ul className="divide-y divide-border/60">
+                {logs.map((log) => {
+                  const Icon = actionIcon(log.action);
+                  return (
+                    <li key={log.id} className="flex items-start gap-3 px-5 py-4">
+                      <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl bg-muted/55">
+                        <Icon className="size-4 text-[var(--orbe-blue)]" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-medium">{humanAction(log.action)}</span>
+                          <Pill tone={actionTone(log)}>
+                            {log.level === "error" ? "falha" : log.level === "warn" ? "revisar" : "registrado"}
+                          </Pill>
+                        </div>
+                        <div className="mt-1 break-all text-xs text-muted-foreground">{log.target}</div>
+                        <details className="mt-2">
+                          <summary className="cursor-pointer text-[11px] text-muted-foreground">ver registro técnico</summary>
+                          <div className="mt-2 rounded-lg bg-muted/45 p-2 font-mono text-[10px] text-muted-foreground">
+                            {log.action} · {log.resourceType ?? "system"} · {log.actor}
+                          </div>
+                        </details>
                       </div>
+                      <span className="shrink-0 text-[11px] text-muted-foreground">{formatDate(log.at)}</span>
                     </li>
                   );
                 })}
@@ -308,234 +625,192 @@ function AdminPage() {
           </GlassCard>
         </TabsContent>
 
-        <TabsContent value="usage" className="mt-5 space-y-3">
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {providerUsage.map((item) => (
-              <GlassCard key={item.provider} hoverable={false}>
-                <div className="flex items-center justify-between">
-                  <div className="font-semibold">{item.provider}</div>
-                  <Pill tone="blue">{item.requests} req</Pill>
-                </div>
-                <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                  <div className="orbe-surface p-2 tabular-nums">{item.tokens.toLocaleString("pt-BR")} tokens</div>
-                  <div className="orbe-surface p-2 tabular-nums">{formatCost(item.costUsd)}</div>
-                </div>
-              </GlassCard>
-            ))}
-            {providerUsage.length === 0 && (
-              <p className="text-sm text-muted-foreground">Nenhum uso registrado.</p>
-            )}
-          </div>
-
-          <GlassCard hoverable={false}>
-            <ul className="divide-y divide-border/60">
-              {usage.map((u, i) => (
-                <li key={`${u.date}-${u.provider}-${i}`} className="py-3 flex items-center gap-3 text-sm flex-wrap first:pt-0 last:pb-0">
-                  <span className="text-muted-foreground w-24 tabular-nums">{u.date}</span>
-                  <Pill tone="blue">{u.provider}</Pill>
-                  <span className="tabular-nums">{u.tokens.toLocaleString("pt-BR")} tokens</span>
-                  <span className="text-muted-foreground tabular-nums">{u.requests} req</span>
-                  <span className="ml-auto tabular-nums font-medium">{formatCost(u.costUsd)}</span>
-                </li>
-              ))}
-              {usage.length === 0 && (
-                <li className="py-3 text-sm text-muted-foreground">Nenhuma métrica de uso.</li>
-              )}
-            </ul>
-          </GlassCard>
-        </TabsContent>
-
-        <TabsContent value="events" className="mt-5">
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {eventBuckets.map((bucket) => (
-              <GlassCard key={bucket.name} hoverable={false}>
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="font-semibold">{bucket.name}</div>
-                    <div className="text-xs text-muted-foreground mt-1">eventos registrados</div>
-                  </div>
-                  <div className="text-2xl font-semibold tabular-nums">{bucket.count}</div>
-                </div>
-              </GlassCard>
-            ))}
-            {eventBuckets.length === 0 && (
-              <p className="text-sm text-muted-foreground">Nenhum evento agrupado.</p>
-            )}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="flags" className="mt-5">
-          <div className="grid md:grid-cols-2 gap-3">
-            {flags.map((f) => (
-              <GlassCard key={f.key} className={cn(f.enabled && "orbe-active")}>
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="font-medium flex items-center gap-2">
-                      <StatusDot tone={f.enabled ? "success" : "neutral"} pulse={false} />
-                      {f.label}
-                    </div>
-                    <div className="text-[11px] text-muted-foreground mt-1 font-mono">{f.key} · {f.audience}</div>
-                  </div>
-                  <Switch checked={f.enabled} onCheckedChange={() => onToggleFlag(f.key)} />
-                </div>
-              </GlassCard>
-            ))}
-          </div>
-        </TabsContent>
-
-
-        <TabsContent value="workspace" className="mt-5 space-y-3">
-          <div className="grid lg:grid-cols-[1fr_320px] gap-3">
+        <TabsContent value="usage" className="mt-5 space-y-4">
+          <div className="grid gap-3 sm:grid-cols-3">
             <GlassCard hoverable={false}>
-              <div className="flex items-center gap-2 mb-4">
-                <Settings className="size-4 text-[var(--orbe-blue)]" />
+              <div className="flex items-center gap-2 text-xs text-muted-foreground"><Zap className="size-3.5" /> Solicitações</div>
+              <div className="mt-2 text-2xl font-semibold tabular-nums">{totals.requests}</div>
+            </GlassCard>
+            <GlassCard hoverable={false}>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground"><WalletCards className="size-3.5" /> Custo estimado</div>
+              <div className="mt-2 text-2xl font-semibold tabular-nums">{formatCost(totals.costUsd)}</div>
+            </GlassCard>
+            <GlassCard hoverable={false}>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground"><Database className="size-3.5" /> Volume processado</div>
+              <div className="mt-2 text-2xl font-semibold tabular-nums">{totals.tokens.toLocaleString("pt-BR")}</div>
+              <div className="mt-1 text-[11px] text-muted-foreground">unidades técnicas de texto</div>
+            </GlassCard>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+            <GlassCard hoverable={false}>
+              <h2 className="font-semibold">Por motor de inteligência</h2>
+              <p className="mt-1 text-xs text-muted-foreground">Distribuição das solicitações processadas.</p>
+              <div className="mt-4 space-y-3">
+                {engineUsage.map((item) => (
+                  <div key={item.provider} className="rounded-xl border border-border/60 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="font-medium capitalize">{item.provider}</span>
+                      <Pill tone="blue">{item.requests} solicitações</Pill>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                      <span>{formatCost(item.costUsd)}</span>
+                      <span>{item.tokens.toLocaleString("pt-BR")} unidades</span>
+                    </div>
+                  </div>
+                ))}
+                {engineUsage.length === 0 && <p className="text-sm text-muted-foreground">Nenhum consumo registrado.</p>}
+              </div>
+            </GlassCard>
+
+            <GlassCard hoverable={false}>
+              <h2 className="font-semibold">Histórico de consumo</h2>
+              <p className="mt-1 text-xs text-muted-foreground">Uma linha por período e motor utilizado.</p>
+              <div className="mt-4 overflow-x-auto">
+                <table className="w-full min-w-[560px] text-left text-sm">
+                  <thead className="text-xs text-muted-foreground">
+                    <tr className="border-b border-border/60">
+                      <th className="pb-3 font-medium">Data</th>
+                      <th className="pb-3 font-medium">Motor</th>
+                      <th className="pb-3 text-right font-medium">Solicitações</th>
+                      <th className="pb-3 text-right font-medium">Custo</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/60">
+                    {usage.map((item, index) => (
+                      <tr key={`${item.date}-${item.provider}-${index}`}>
+                        <td className="py-3 text-muted-foreground">{item.date}</td>
+                        <td className="py-3 capitalize">{item.provider}</td>
+                        <td className="py-3 text-right tabular-nums">{item.requests}</td>
+                        <td className="py-3 text-right font-medium tabular-nums">{formatCost(item.costUsd)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </GlassCard>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="features" className="mt-5">
+          <div className="mb-4 max-w-2xl">
+            <h2 className="text-lg font-semibold">Recursos em teste</h2>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+              Libere novidades aos poucos antes de disponibilizá-las para todo mundo.
+            </p>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            {flags.map((flag) => (
+              <GlassCard key={flag.key} hoverable={false} className={cn(flag.enabled && "border-blue-200/80 bg-blue-50/25")}>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <span className={cn(
+                      "mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl",
+                      flag.enabled ? "bg-blue-100 text-blue-600" : "bg-muted text-muted-foreground",
+                    )}>
+                      <SlidersHorizontal className="size-4" />
+                    </span>
+                    <div className="min-w-0">
+                      <div className="font-medium">{flag.label}</div>
+                      <div className="mt-1 text-xs text-muted-foreground">{audienceLabel(flag.audience)}</div>
+                      <details className="mt-2">
+                        <summary className="cursor-pointer text-[11px] text-muted-foreground">identificador técnico</summary>
+                        <code className="mt-1 block break-all rounded bg-muted/60 px-2 py-1 text-[10px]">{flag.key}</code>
+                      </details>
+                    </div>
+                  </div>
+                  <Switch checked={flag.enabled} onCheckedChange={() => onToggleFlag(flag.key)} />
+                </div>
+              </GlassCard>
+            ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="system" className="mt-5 space-y-4">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+            <GlassCard hoverable={false}>
+              <div className="flex items-start gap-3">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
+                  <ServerCog className="size-4" />
+                </span>
                 <div>
-                  <div className="font-semibold">Configurações do workspace</div>
-                  <div className="text-xs text-muted-foreground">Preferências persistidas no backend para a operação da orbeAI.</div>
+                  <h2 className="font-semibold">Saúde da plataforma</h2>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">Estado das partes essenciais para a orbeAI funcionar.</p>
                 </div>
               </div>
 
-              <div className="grid md:grid-cols-2 gap-3">
-                <label className="space-y-1.5">
-                  <span className="text-xs text-muted-foreground">Nome</span>
-                  <Input value={workspaceName} onChange={(e) => setWorkspaceName(e.target.value)} />
-                </label>
+              <ul className="mt-5 divide-y divide-border/60">
+                {[
+                  { label: "Aplicação", value: "operacional" },
+                  { label: "Armazenamento", value: "disponível" },
+                  { label: "Motores de inteligência", value: "prontos com continuidade" },
+                  { label: "Memória", value: "ativa e controlável" },
+                  { label: "Histórico de segurança", value: "registrando mudanças" },
+                ].map((item) => (
+                  <li key={item.label} className="flex items-center gap-3 py-3.5 first:pt-0 last:pb-0">
+                    <StatusDot tone="success" pulse={false} />
+                    <span className="text-sm font-medium">{item.label}</span>
+                    <span className="ml-auto text-right text-xs text-muted-foreground">{item.value}</span>
+                  </li>
+                ))}
+              </ul>
+            </GlassCard>
 
-                <label className="space-y-1.5">
-                  <span className="text-xs text-muted-foreground">Plano</span>
-                  <Input value={workspacePlan} onChange={(e) => setWorkspacePlan(e.target.value)} />
-                </label>
+            <div className="space-y-4">
+              <GlassCard hoverable={false}>
+                <div className="flex items-center gap-2">
+                  <Database className="size-4 text-[var(--orbe-blue)]" />
+                  <h2 className="font-semibold">Identificação técnica</h2>
+                </div>
+                <dl className="mt-4 space-y-3 text-sm">
+                  <div className="flex justify-between gap-3"><dt className="text-muted-foreground">endereço interno</dt><dd className="font-mono text-xs">{workspace?.slug ?? "—"}</dd></div>
+                  <div className="flex justify-between gap-3"><dt className="text-muted-foreground">idioma</dt><dd>{workspace?.settings.locale ?? "pt-BR"}</dd></div>
+                  <div className="flex justify-between gap-3"><dt className="text-muted-foreground">atualizado</dt><dd className="text-xs">{workspace ? formatDate(workspace.updatedAt) : "—"}</dd></div>
+                </dl>
+                <details className="mt-4 rounded-xl bg-muted/45 p-3">
+                  <summary className="cursor-pointer text-xs font-medium">ver identificador completo</summary>
+                  <code className="mt-2 block break-all text-[10px] text-muted-foreground">{workspace?.id ?? "—"}</code>
+                </details>
+              </GlassCard>
 
-                <label className="space-y-1.5">
-                  <span className="text-xs text-muted-foreground">Timezone</span>
-                  <Input value={workspaceTimezone} onChange={(e) => setWorkspaceTimezone(e.target.value)} />
-                </label>
-
-                <label className="space-y-1.5">
-                  <span className="text-xs text-muted-foreground">Retenção de dados, dias</span>
-                  <Input value={dataRetentionDays} onChange={(e) => setDataRetentionDays(e.target.value)} inputMode="numeric" />
-                </label>
-
-                <label className="space-y-1.5">
-                  <span className="text-xs text-muted-foreground">Modo padrão do chat</span>
-                  <Select value={defaultChatMode} onValueChange={setDefaultChatMode}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="strategist">strategist</SelectItem>
-                      <SelectItem value="dev">dev</SelectItem>
-                      <SelectItem value="document">document</SelectItem>
-                      <SelectItem value="research">research</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </label>
-
-                <label className="space-y-1.5">
-                  <span className="text-xs text-muted-foreground">Modelo padrão</span>
-                  <Select value={defaultModelPreference} onValueChange={setDefaultModelPreference}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="auto">auto</SelectItem>
-                      <SelectItem value="openai">openai</SelectItem>
-                      <SelectItem value="gemini">gemini</SelectItem>
-                      <SelectItem value="mock">mock</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </label>
-
-                <label className="space-y-1.5">
-                  <span className="text-xs text-muted-foreground">Política de memória</span>
-                  <Select value={memoryPolicy} onValueChange={setMemoryPolicy}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="strict">strict</SelectItem>
-                      <SelectItem value="balanced">balanced</SelectItem>
-                      <SelectItem value="adaptive">adaptive</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </label>
-
-                <div className="space-y-3 rounded-xl border border-border/60 p-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-medium">Permitir exportações</div>
-                      <div className="text-xs text-muted-foreground">Controla exportação de dados e artifacts.</div>
-                    </div>
-                    <Switch checked={allowExports} onCheckedChange={setAllowExports} />
-                  </div>
-
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-medium">Compartilhamento público</div>
-                      <div className="text-xs text-muted-foreground">Mantém links públicos desativados por padrão.</div>
-                    </div>
-                    <Switch checked={allowPublicSharing} onCheckedChange={setAllowPublicSharing} />
+              <GlassCard hoverable={false} className="border-amber-200/70 bg-amber-50/25">
+                <div className="flex items-start gap-3">
+                  <EyeOff className="mt-0.5 size-4 shrink-0 text-amber-600" />
+                  <div>
+                    <h2 className="text-sm font-semibold">Restaurar dados da prévia</h2>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">Apaga somente as alterações salvas neste navegador. Dados reais não são afetados.</p>
                   </div>
                 </div>
-              </div>
-
-              <div className="mt-4 flex justify-end">
-                <Button onClick={onSaveWorkspace}>
-                  <Save className="size-4 mr-1" />
-                  Salvar workspace
+                <Button variant="outline" className="mt-4 w-full" onClick={() => setResetOpen(true)}>
+                  Restaurar prévia
                 </Button>
-              </div>
-            </GlassCard>
-
-            <GlassCard hoverable={false}>
-              <div className="flex items-center gap-2">
-                <Globe2 className="size-4 text-[var(--orbe-blue)]" />
-                <div className="font-semibold">Identidade</div>
-              </div>
-
-              <div className="mt-4 space-y-3 text-sm">
-                <div className="flex justify-between gap-3">
-                  <span className="text-muted-foreground">slug</span>
-                  <span className="font-mono text-xs">{workspace?.slug ?? "—"}</span>
-                </div>
-                <div className="flex justify-between gap-3">
-                  <span className="text-muted-foreground">id</span>
-                  <span className="font-mono text-xs truncate max-w-[180px]">{workspace?.id ?? "—"}</span>
-                </div>
-                <div className="flex justify-between gap-3">
-                  <span className="text-muted-foreground">locale</span>
-                  <span>{workspace?.settings.locale ?? "pt-BR"}</span>
-                </div>
-                <div className="flex justify-between gap-3">
-                  <span className="text-muted-foreground">atualizado</span>
-                  <span>{workspace ? formatDate(workspace.updatedAt) : "—"}</span>
-                </div>
-              </div>
-            </GlassCard>
+              </GlassCard>
+            </div>
           </div>
-        </TabsContent>
 
-        <TabsContent value="health" className="mt-5">
-          <GlassCard hoverable={false}>
-            <ul className="text-sm divide-y divide-border/60">
-              {[
-                { tone: "success" as const, label: "API backend", value: "operacional" },
-                { tone: "success" as const, label: "Postgres", value: "persistência real" },
-                { tone: "success" as const, label: "Providers", value: "OpenAI/Gemini + fallback" },
-                { tone: "success" as const, label: "Memória", value: "automática, curável e contextual" },
-                { tone: "success" as const, label: "Auditoria", value: "audit_logs real" },
-              ].map((h) => (
-                <li key={h.label} className="py-3 flex items-center gap-3 first:pt-0 last:pb-0">
-                  <StatusDot tone={h.tone} />
-                  <span className="font-medium">{h.label}</span>
-                  <span className="ml-auto text-muted-foreground text-xs">{h.value}</span>
-                </li>
-              ))}
-            </ul>
-          </GlassCard>
+          {eventBuckets.length > 0 && (
+            <GlassCard hoverable={false}>
+              <h2 className="font-semibold">Distribuição dos registros técnicos</h2>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {eventBuckets.slice(0, 8).map((bucket) => (
+                  <div key={bucket.name} className="rounded-xl bg-muted/45 p-3">
+                    <div className="truncate text-xs capitalize text-muted-foreground">{bucket.name}</div>
+                    <div className="mt-1 text-xl font-semibold tabular-nums">{bucket.count}</div>
+                  </div>
+                ))}
+              </div>
+            </GlassCard>
+          )}
         </TabsContent>
       </Tabs>
 
       <ConfirmDialog
         open={resetOpen}
         onOpenChange={setResetOpen}
-        title="Resetar dados locais de demonstração?"
-        description="Isso afeta apenas dados locais do navegador. Dados reais do backend não são apagados."
-        confirmLabel="Resetar local"
+        title="Restaurar os dados desta prévia?"
+        description="As alterações locais deste navegador serão apagadas. Nenhum dado real do servidor será removido."
+        confirmLabel="Restaurar prévia"
         destructive
         onConfirm={onReset}
       />
