@@ -22,9 +22,9 @@ jobs:
         with:
           python-version: "3.12"
       - name: install
-        run: pip install -e ".[dev]"
+        run: pip install -q -e ".[dev]"
       - name: lint
-        run: ruff check app tests
+        run: ruff check app tests --output-format=concise
       - name: tests
         run: pytest -q
 
@@ -39,9 +39,9 @@ jobs:
         with:
           python-version: "3.12"
       - name: install
-        run: pip install -e ".[dev]"
+        run: pip install -q -e ".[dev]"
       - name: lint
-        run: ruff check app tests
+        run: ruff check app tests --output-format=concise
       - name: tests
         run: pytest -q
 
@@ -56,7 +56,7 @@ jobs:
         with:
           node-version: "22"
       - name: install
-        run: npm install
+        run: npm install --silent
       - name: typecheck
         run: npm run typecheck
       - name: build
