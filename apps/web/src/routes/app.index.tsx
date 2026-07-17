@@ -5,21 +5,23 @@ import {
   BookOpen,
   Brain,
   FileSearch,
+  FileText,
   FolderKanban,
   GraduationCap,
-  ImagePlus,
   Library,
+  Lightbulb,
   MessageSquare,
   Mic,
   Paperclip,
   Search,
+  Send,
   Sparkles,
+  SunMedium,
   WandSparkles,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
-import { Button } from "@/components/ui/button";
 import { artifactService, chatService, memoryService, projectService } from "@/lib/api";
 import { getStoredAuthUser } from "@/lib/auth/session";
 import type { Artifact, Chat, MemoryItem, Project } from "@/types";
@@ -33,47 +35,71 @@ type ExploreItem = {
   title: string;
   description: string;
   icon: typeof MessageSquare;
-  to: "/app/chat" | "/app/research" | "/app/artifacts" | "/app/projects" | "/app/memory";
+  to: "/app/chat" | "/app/research" | "/app/artifacts" | "/app/projects";
+  shellClass: string;
+  iconClass: string;
 };
 
 const exploreItems: ExploreItem[] = [
   {
     title: "Conversar",
-    description: "Pergunte, pense em voz alta ou simplesmente troque uma ideia.",
+    description: "Fale sobre qualquer assunto",
     icon: MessageSquare,
     to: "/app/chat",
+    shellClass: "border-blue-200/70 bg-blue-50/55",
+    iconClass: "bg-blue-100/80 text-blue-600",
   },
   {
     title: "Pesquisar",
-    description: "Explore um assunto com mais profundidade e contexto.",
+    description: "Encontre respostas confiáveis",
     icon: Search,
     to: "/app/research",
+    shellClass: "border-emerald-200/70 bg-emerald-50/55",
+    iconClass: "bg-emerald-100/80 text-emerald-600",
   },
   {
-    title: "Analisar um arquivo",
-    description: "Envie um documento, imagem ou material para entender melhor.",
+    title: "Analisar arquivo",
+    description: "Extraia insights de qualquer documento",
     icon: FileSearch,
     to: "/app/chat",
+    shellClass: "border-violet-200/70 bg-violet-50/55",
+    iconClass: "bg-violet-100/80 text-violet-600",
   },
   {
-    title: "Criar alguma coisa",
-    description: "Transforme uma ideia em texto, plano, imagem ou artifact.",
+    title: "Criar",
+    description: "Gere conteúdos, ideias e soluções",
     icon: WandSparkles,
     to: "/app/artifacts",
+    shellClass: "border-purple-200/70 bg-purple-50/45",
+    iconClass: "bg-purple-100/80 text-purple-600",
   },
   {
     title: "Aprender",
-    description: "Estude no seu ritmo, com explicações feitas para você.",
+    description: "Estude, entenda e evolua",
     icon: GraduationCap,
     to: "/app/chat",
+    shellClass: "border-amber-200/70 bg-amber-50/55",
+    iconClass: "bg-amber-100/80 text-amber-600",
   },
   {
-    title: "Organizar uma ideia",
-    description: "Dê forma a planos pessoais, estudos ou projetos de trabalho.",
-    icon: FolderKanban,
+    title: "Organizar ideia",
+    description: "Transforme pensamentos em planos",
+    icon: Lightbulb,
     to: "/app/projects",
+    shellClass: "border-rose-200/70 bg-rose-50/50",
+    iconClass: "bg-rose-100/80 text-rose-600",
   },
 ];
+
+function relativeDate(value?: string) {
+  if (!value) return "recentemente";
+
+  try {
+    return formatDistanceToNow(new Date(value), { addSuffix: true, locale: ptBR });
+  } catch {
+    return "recentemente";
+  }
+}
 
 function Dashboard() {
   const [chats, setChats] = useState<Chat[]>([]);
@@ -102,203 +128,361 @@ function Dashboard() {
 
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
-    if (hour < 12) return "bom dia";
-    if (hour < 18) return "boa tarde";
-    return "boa noite";
+    if (hour < 12) return "Bom dia";
+    if (hour < 18) return "Boa tarde";
+    return "Boa noite";
   }, []);
 
   const latestChat = chats[0];
   const latestProject = projects[0];
   const latestArtifact = artifacts[0];
+  const latestMemory = memories[0];
+  const activeProjects = projects.filter((project) => project.status === "ativo").length;
+
+  const documentCount = artifacts.filter((artifact) =>
+    ["documento", "relatório", "contrato"].includes(artifact.kind),
+  ).length;
+  const planCount = artifacts.filter((artifact) =>
+    ["plano de ação", "playbook", "checklist"].includes(artifact.kind),
+  ).length;
+  const otherArtifactCount = Math.max(0, artifacts.length - documentCount - planCount);
+
+  const activities = [
+    latestMemory && {
+      key: `memory-${latestMemory.id}`,
+      icon: Brain,
+      iconClass: "bg-violet-100 text-violet-600",
+      label: `Memória criada: ${latestMemory.label}`,
+      date: latestMemory.updatedAt || latestMemory.createdAt || latestMemory.lastUsed,
+    },
+    latestArtifact && {
+      key: `artifact-${latestArtifact.id}`,
+      icon: FileText,
+      iconClass: "bg-blue-100 text-blue-600",
+      label: `Arquivo atualizado: ${latestArtifact.title}`,
+      date: latestArtifact.updatedAt,
+    },
+    latestChat && {
+      key: `chat-${latestChat.id}`,
+      icon: MessageSquare,
+      iconClass: "bg-sky-100 text-sky-600",
+      label: `Conversa: ${latestChat.title}`,
+      date: latestChat.updatedAt,
+    },
+    latestProject && {
+      key: `project-${latestProject.id}`,
+      icon: Lightbulb,
+      iconClass: "bg-amber-100 text-amber-600",
+      label: `Projeto atualizado: ${latestProject.name}`,
+      date: latestProject.updatedAt,
+    },
+  ].filter(Boolean) as Array<{
+    key: string;
+    icon: typeof MessageSquare;
+    iconClass: string;
+    label: string;
+    date: string;
+  }>;
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-10 pb-10">
-      <section className="relative overflow-hidden rounded-[2rem] border border-border/70 bg-card px-5 py-8 shadow-sm sm:px-8 md:px-12 md:py-12">
+    <div className="mx-auto w-full max-w-[1320px] space-y-6 pb-10">
+      <section className="relative overflow-hidden rounded-[1.75rem] border border-border/70 bg-card px-5 py-5 shadow-[0_16px_50px_-32px_rgba(15,23,42,0.45)] sm:px-7 sm:py-6">
         <div
-          className="pointer-events-none absolute -right-24 -top-32 size-96 rounded-full opacity-30"
-          style={{ background: "radial-gradient(circle, var(--orbe-blue), transparent 64%)" }}
+          className="pointer-events-none absolute -right-20 -top-32 size-[28rem] rounded-full opacity-25"
+          style={{ background: "radial-gradient(circle, #c4b5fd 0%, #bfdbfe 34%, transparent 68%)" }}
         />
         <div
-          className="pointer-events-none absolute -bottom-40 left-1/3 size-80 rounded-full opacity-15"
-          style={{ background: "radial-gradient(circle, var(--orbe-cyan), transparent 66%)" }}
+          className="pointer-events-none absolute -bottom-36 right-1/4 size-72 rounded-full opacity-15"
+          style={{ background: "radial-gradient(circle, var(--orbe-cyan), transparent 68%)" }}
         />
 
-        <div className="relative mx-auto max-w-4xl text-center">
-          <div className="mx-auto mb-5 flex size-12 items-center justify-center rounded-2xl border border-[color-mix(in_oklch,var(--orbe-blue)_25%,transparent)] bg-[color-mix(in_oklch,var(--orbe-blue)_10%,transparent)]">
-            <Sparkles className="size-5 text-[var(--orbe-blue)]" />
+        <div className="relative">
+          <div className="flex items-start gap-4">
+            <div className="mt-0.5 flex size-12 shrink-0 items-center justify-center rounded-2xl border border-border/70 bg-background/85 shadow-sm">
+              <SunMedium className="size-6 text-[var(--orbe-blue)]" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+                {greeting}, {firstName}.
+              </h1>
+              <p className="mt-0.5 text-xl leading-tight text-foreground/75 sm:text-2xl">
+                No que vamos mergulhar hoje?
+              </p>
+            </div>
+            <Sparkles className="ml-auto mt-4 hidden size-7 text-[var(--orbe-blue)] sm:block" />
           </div>
-
-          <h1 className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl md:text-5xl">
-            {greeting}, {firstName}. No que vamos mergulhar hoje?
-          </h1>
-          <p className="mx-auto mt-4 max-w-2xl text-pretty text-sm leading-6 text-muted-foreground sm:text-base">
-            Converse, crie, pesquise, estude ou organize qualquer parte da sua vida. A orbeAI se adapta ao seu contexto, não o contrário.
-          </p>
 
           <Link
             to="/app/chat"
-            className="group mx-auto mt-8 flex min-h-16 w-full max-w-3xl items-center gap-3 rounded-2xl border border-border/80 bg-background/90 px-4 py-3 text-left shadow-sm transition hover:border-[color-mix(in_oklch,var(--orbe-blue)_35%,var(--border))] hover:shadow-md sm:px-5"
+            className="group mt-5 flex min-h-13 w-full items-center gap-3 rounded-xl border border-blue-200/80 bg-background/90 px-4 py-3 text-left shadow-sm transition hover:border-blue-300 hover:shadow-md"
           >
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[color-mix(in_oklch,var(--orbe-blue)_10%,transparent)]">
-              <MessageSquare className="size-5 text-[var(--orbe-blue)]" />
-            </div>
             <span className="min-w-0 flex-1 text-sm text-muted-foreground sm:text-base">
-              Escreva uma pergunta, ideia ou assunto...
+              Envie uma mensagem para a orbeAI...
             </span>
-            <div className="hidden items-center gap-1.5 text-muted-foreground sm:flex">
-              <Paperclip className="size-4" />
-              <Mic className="size-4" />
-              <ImagePlus className="size-4" />
-            </div>
-            <ArrowRight className="size-5 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-[var(--orbe-blue)]" />
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--orbe-blue)] text-white shadow-sm transition group-hover:scale-[1.03]">
+              <Send className="size-4" />
+            </span>
           </Link>
 
-          <div className="mt-4 flex flex-wrap justify-center gap-2">
-            {["me ajuda a pensar", "explica isso pra mim", "vamos criar algo", "quero pesquisar um tema"].map((label) => (
-              <Button key={label} variant="outline" size="sm" asChild className="rounded-full bg-background/65">
-                <Link to="/app/chat">{label}</Link>
-              </Button>
-            ))}
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link
+              to="/app/chat"
+              className="inline-flex items-center gap-2 rounded-full border border-border/80 bg-background/75 px-4 py-2 text-xs font-medium transition hover:bg-accent sm:text-sm"
+            >
+              <Paperclip className="size-4" /> Anexar arquivo
+            </Link>
+            <Link
+              to="/app/chat"
+              className="inline-flex items-center gap-2 rounded-full border border-border/80 bg-background/75 px-4 py-2 text-xs font-medium transition hover:bg-accent sm:text-sm"
+            >
+              <Mic className="size-4" /> Usar voz
+            </Link>
+            <Link
+              to="/app/research"
+              className="inline-flex items-center gap-2 rounded-full border border-border/80 bg-background/75 px-4 py-2 text-xs font-medium transition hover:bg-accent sm:text-sm"
+            >
+              <Search className="size-4" /> Pesquisa profunda
+            </Link>
+            <Link
+              to="/app/chat"
+              className="inline-flex items-center gap-2 rounded-full border border-border/80 bg-background/75 px-4 py-2 text-xs font-medium transition hover:bg-accent sm:text-sm"
+            >
+              <Sparkles className="size-4" /> Inspirar-me
+            </Link>
           </div>
         </div>
       </section>
 
-      <section className="space-y-4">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">explorar</p>
-          <h2 className="mt-1 text-2xl font-semibold tracking-tight">Escolha um ponto de partida</h2>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {exploreItems.map(({ title, description, icon: Icon, to }) => (
+      <section className="space-y-3">
+        <h2 className="text-base font-semibold tracking-tight">Escolha um caminho</h2>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          {exploreItems.map(({ title, description, icon: Icon, to, shellClass, iconClass }) => (
             <Link
               key={title}
               to={to}
-              className="group flex min-h-36 items-start gap-4 rounded-2xl border border-border/70 bg-card p-5 transition hover:-translate-y-0.5 hover:border-[color-mix(in_oklch,var(--orbe-blue)_30%,var(--border))] hover:shadow-md"
+              className={`group min-h-36 rounded-2xl border p-4 transition hover:-translate-y-0.5 hover:shadow-md ${shellClass}`}
             >
-              <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[color-mix(in_oklch,var(--orbe-blue)_9%,transparent)]">
-                <Icon className="size-5 text-[var(--orbe-blue)]" />
+              <div className={`flex size-9 items-center justify-center rounded-xl ${iconClass}`}>
+                <Icon className="size-5" />
               </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-3">
-                  <h3 className="font-medium">{title}</h3>
-                  <ArrowRight className="size-4 shrink-0 text-muted-foreground/50 transition group-hover:translate-x-0.5 group-hover:text-[var(--orbe-blue)]" />
-                </div>
-                <p className="mt-2 text-sm leading-5 text-muted-foreground">{description}</p>
-              </div>
+              <h3 className="mt-5 font-semibold">{title}</h3>
+              <p className="mt-1 text-sm leading-5 text-foreground/65">{description}</p>
             </Link>
           ))}
         </div>
       </section>
 
-      <section className="space-y-4">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">continuar</p>
-            <h2 className="mt-1 text-2xl font-semibold tracking-tight">Retome de onde parou</h2>
-          </div>
-          <Button variant="ghost" size="sm" asChild>
-            <Link to="/app/chat">Ver tudo <ArrowRight className="ml-1 size-4" /></Link>
-          </Button>
-        </div>
-
-        <div className="grid gap-4 lg:grid-cols-12">
-          <Link
-            to="/app/chat"
-            className="group rounded-3xl border border-border/70 bg-card p-6 transition hover:border-[color-mix(in_oklch,var(--orbe-blue)_30%,var(--border))] hover:shadow-md lg:col-span-7"
-          >
-            <div className="flex items-start gap-4">
-              <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-[color-mix(in_oklch,var(--orbe-blue)_10%,transparent)]">
-                <MessageSquare className="size-5 text-[var(--orbe-blue)]" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">última conversa</p>
-                <h3 className="mt-2 truncate text-xl font-semibold">
-                  {latestChat?.title || "Comece sua primeira conversa"}
-                </h3>
-                <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted-foreground">
-                  {latestChat
-                    ? `Continue no modo ${latestChat.mode || "padrão"} com todo o contexto preservado.`
-                    : "A orbeAI está pronta para conhecer seu jeito de pensar e trabalhar com você."}
-                </p>
-                <div className="mt-5 flex items-center gap-2 text-sm font-medium text-[var(--orbe-blue)]">
-                  {latestChat ? "Continuar conversa" : "Abrir chat"}
-                  <ArrowRight className="size-4 transition group-hover:translate-x-0.5" />
-                </div>
-              </div>
-            </div>
-          </Link>
-
-          <div className="grid gap-4 sm:grid-cols-2 lg:col-span-5 lg:grid-cols-1">
-            <Link
-              to={latestProject ? "/app/projects/$id" : "/app/projects"}
-              params={latestProject ? { id: latestProject.id } : undefined}
-              className="group flex min-h-32 items-start gap-4 rounded-2xl border border-border/70 bg-card p-5 transition hover:border-[color-mix(in_oklch,var(--orbe-blue)_30%,var(--border))] hover:shadow-md"
-            >
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[color-mix(in_oklch,var(--orbe-cyan)_10%,transparent)]">
-                <FolderKanban className="size-5 text-[var(--orbe-blue)]" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">projeto recente</p>
-                <h3 className="mt-1 truncate font-medium">{latestProject?.name || "Crie um espaço para uma ideia"}</h3>
-                <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-                  {latestProject?.description || "Junte conversas, arquivos e referências em um só lugar."}
-                </p>
-              </div>
+      <section className="grid gap-4 xl:grid-cols-[1.35fr_1fr]">
+        <div className="rounded-2xl border border-border/70 bg-card p-4 sm:p-5">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="font-semibold">Continuar de onde parou</h2>
+            <Link to="/app/chat" className="text-sm font-medium text-[var(--orbe-blue)] hover:underline">
+              Ver tudo
             </Link>
+          </div>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <Link
+              to="/app/chat"
+              className="group flex min-h-16 items-center gap-3 rounded-xl border border-border/60 bg-background/70 p-3 shadow-sm transition hover:border-blue-200 hover:shadow-md"
+            >
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
+                <MessageSquare className="size-5" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-semibold">
+                  {latestChat?.title || "Comece uma conversa com a orbeAI"}
+                </span>
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  Conversa · {relativeDate(latestChat?.updatedAt)}
+                </span>
+              </span>
+              <ArrowRight className="size-4 text-muted-foreground transition group-hover:translate-x-0.5" />
+            </Link>
+
+            {latestProject ? (
+              <Link
+                to="/app/projects/$id"
+                params={{ id: latestProject.id }}
+                className="group flex min-h-16 items-center gap-3 rounded-xl border border-border/60 bg-background/70 p-3 shadow-sm transition hover:border-violet-200 hover:shadow-md"
+              >
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
+                  <FolderKanban className="size-5" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold">{latestProject.name}</span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                    Projeto · {relativeDate(latestProject.updatedAt)}
+                  </span>
+                </span>
+                <ArrowRight className="size-4 text-muted-foreground transition group-hover:translate-x-0.5" />
+              </Link>
+            ) : (
+              <Link
+                to="/app/projects"
+                className="group flex min-h-16 items-center gap-3 rounded-xl border border-border/60 bg-background/70 p-3 shadow-sm transition hover:border-violet-200 hover:shadow-md"
+              >
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
+                  <FolderKanban className="size-5" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold">Crie seu primeiro projeto</span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">Organize uma ideia em um só lugar</span>
+                </span>
+                <ArrowRight className="size-4 text-muted-foreground transition group-hover:translate-x-0.5" />
+              </Link>
+            )}
 
             <Link
               to="/app/artifacts"
-              className="group flex min-h-32 items-start gap-4 rounded-2xl border border-border/70 bg-card p-5 transition hover:border-[color-mix(in_oklch,var(--orbe-blue)_30%,var(--border))] hover:shadow-md"
+              className="group flex min-h-16 items-center gap-3 rounded-xl border border-border/60 bg-background/70 p-3 shadow-sm transition hover:border-emerald-200 hover:shadow-md sm:col-span-2 sm:max-w-[calc(50%-0.375rem)]"
             >
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[color-mix(in_oklch,var(--orbe-blue)_9%,transparent)]">
-                <Library className="size-5 text-[var(--orbe-blue)]" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">criação recente</p>
-                <h3 className="mt-1 truncate font-medium">{latestArtifact?.title || "Sua biblioteca começa aqui"}</h3>
-                <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-                  {latestArtifact ? `Criado ${formatDistanceToNow(new Date(latestArtifact.updatedAt), { addSuffix: true, locale: ptBR })}.` : "Textos, planos e criações ficam organizados para você reencontrar."}
-                </p>
-              </div>
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
+                <FileText className="size-5" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-semibold">
+                  {latestArtifact?.title || "Sua biblioteca começa aqui"}
+                </span>
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  {latestArtifact ? `${latestArtifact.kind} · ${relativeDate(latestArtifact.updatedAt)}` : "Crie e guarde conteúdos importantes"}
+                </span>
+              </span>
+              <ArrowRight className="size-4 text-muted-foreground transition group-hover:translate-x-0.5" />
             </Link>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-border/70 bg-card p-4 sm:p-5">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="font-semibold">Atividade recente</h2>
+            <Link to="/app/admin" className="text-sm font-medium text-[var(--orbe-blue)] hover:underline">
+              Ver tudo
+            </Link>
+          </div>
+
+          <div className="mt-4 space-y-1">
+            {activities.length > 0 ? (
+              activities.map(({ key, icon: Icon, iconClass, label, date }) => (
+                <div key={key} className="flex items-center gap-3 rounded-xl px-2 py-2.5 transition hover:bg-accent/45">
+                  <span className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${iconClass}`}>
+                    <Icon className="size-4" />
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-sm text-foreground/80">{label}</span>
+                  <span className="shrink-0 text-xs text-muted-foreground">{relativeDate(date)}</span>
+                </div>
+              ))
+            ) : (
+              <div className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground">
+                Suas conversas, arquivos e projetos recentes aparecerão aqui.
+              </div>
+            )}
           </div>
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-3">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Link to="/app/memory" className="rounded-2xl border border-border/70 bg-card p-5 transition hover:shadow-md">
           <div className="flex items-center justify-between gap-3">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-[color-mix(in_oklch,var(--orbe-blue)_9%,transparent)]">
-              <Brain className="size-5 text-[var(--orbe-blue)]" />
+            <div className="flex items-center gap-3">
+              <span className="flex size-9 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
+                <Brain className="size-5" />
+              </span>
+              <h2 className="font-semibold">Memórias</h2>
             </div>
-            <span className="text-2xl font-semibold tabular-nums">{memories.length}</span>
+            <span className="rounded-full bg-violet-100 px-2.5 py-1 text-xs font-medium text-violet-700">
+              {memories.length} pendentes
+            </span>
           </div>
-          <h3 className="mt-4 font-medium">Memórias para revisar</h3>
-          <p className="mt-1 text-sm text-muted-foreground">Você decide o que a orbeAI deve guardar sobre você.</p>
+          <div className="mt-5 space-y-3">
+            {memories.slice(0, 3).map((memory) => (
+              <div key={memory.id} className="flex items-center justify-between gap-3 text-sm">
+                <span className="min-w-0 truncate text-foreground/80">{memory.label}</span>
+                <span className="shrink-0 text-xs text-muted-foreground">{relativeDate(memory.updatedAt || memory.createdAt)}</span>
+              </div>
+            ))}
+            {memories.length === 0 && <p className="text-sm text-muted-foreground">Nenhuma memória aguardando revisão.</p>}
+          </div>
+          <div className="mt-5 text-sm font-medium text-[var(--orbe-blue)]">Ver todas</div>
         </Link>
 
         <Link to="/app/projects" className="rounded-2xl border border-border/70 bg-card p-5 transition hover:shadow-md">
           <div className="flex items-center justify-between gap-3">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-[color-mix(in_oklch,var(--orbe-cyan)_10%,transparent)]">
-              <BookOpen className="size-5 text-[var(--orbe-blue)]" />
+            <div className="flex items-center gap-3">
+              <span className="flex size-9 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
+                <FolderKanban className="size-5" />
+              </span>
+              <h2 className="font-semibold">Projetos</h2>
             </div>
-            <span className="text-2xl font-semibold tabular-nums">{projects.length}</span>
+            <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700">
+              {activeProjects} ativos
+            </span>
           </div>
-          <h3 className="mt-4 font-medium">Espaços em andamento</h3>
-          <p className="mt-1 text-sm text-muted-foreground">De planos pessoais a projetos profissionais, tudo cabe aqui.</p>
+          <div className="mt-5 space-y-3">
+            {projects.slice(0, 3).map((project) => (
+              <div key={project.id} className="flex items-center justify-between gap-3 text-sm">
+                <span className="min-w-0 truncate font-medium text-foreground/80">{project.name}</span>
+                <span className="shrink-0 text-xs text-muted-foreground">{relativeDate(project.updatedAt)}</span>
+              </div>
+            ))}
+            {projects.length === 0 && <p className="text-sm text-muted-foreground">Seus projetos pessoais e profissionais aparecerão aqui.</p>}
+          </div>
+          <div className="mt-5 text-sm font-medium text-[var(--orbe-blue)]">Ver todos</div>
         </Link>
 
         <Link to="/app/artifacts" className="rounded-2xl border border-border/70 bg-card p-5 transition hover:shadow-md">
           <div className="flex items-center justify-between gap-3">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-[color-mix(in_oklch,var(--orbe-blue)_9%,transparent)]">
-              <Library className="size-5 text-[var(--orbe-blue)]" />
+            <div className="flex items-center gap-3">
+              <span className="flex size-9 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600">
+                <Library className="size-5" />
+              </span>
+              <h2 className="font-semibold">Biblioteca</h2>
             </div>
-            <span className="text-2xl font-semibold tabular-nums">{artifacts.length}</span>
+            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+              {artifacts.length} itens
+            </span>
           </div>
-          <h3 className="mt-4 font-medium">Itens na biblioteca</h3>
-          <p className="mt-1 text-sm text-muted-foreground">Tudo o que você criou, pronto para continuar evoluindo.</p>
+          <div className="mt-5 space-y-3 text-sm">
+            <div className="flex items-center justify-between gap-3">
+              <span className="flex items-center gap-2 text-foreground/80"><FileText className="size-4 text-muted-foreground" /> Documentos</span>
+              <span className="text-xs text-muted-foreground">{documentCount}</span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="flex items-center gap-2 text-foreground/80"><BookOpen className="size-4 text-muted-foreground" /> Planos e playbooks</span>
+              <span className="text-xs text-muted-foreground">{planCount}</span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="flex items-center gap-2 text-foreground/80"><Library className="size-4 text-muted-foreground" /> Outros itens</span>
+              <span className="text-xs text-muted-foreground">{otherArtifactCount}</span>
+            </div>
+          </div>
+          <div className="mt-5 text-sm font-medium text-[var(--orbe-blue)]">Ver tudo</div>
         </Link>
+
+        <div className="relative overflow-hidden rounded-2xl border border-amber-200/80 bg-[linear-gradient(145deg,rgba(255,251,235,0.95),rgba(255,247,237,0.95))] p-5 shadow-[0_18px_40px_-30px_rgba(245,158,11,0.65)]">
+          <div className="pointer-events-none absolute -bottom-20 -right-16 size-48 rounded-full bg-amber-200/35 blur-2xl" />
+          <div className="relative">
+            <div className="flex items-center gap-3">
+              <Sparkles className="size-5 text-amber-500" />
+              <h2 className="font-semibold">Sugestão para você</h2>
+            </div>
+            <p className="mt-5 text-sm leading-6 text-foreground/75">
+              {latestChat
+                ? `Que tal continuar sua conversa sobre “${latestChat.title}”? Todo o contexto está preservado.`
+                : "Comece uma conversa e a orbeAI aprenderá quais assuntos você quer retomar com mais facilidade."}
+            </p>
+            <Link
+              to="/app/chat"
+              className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
+            >
+              {latestChat ? "Continuar conversa" : "Começar conversa"}
+              <ArrowRight className="size-4" />
+            </Link>
+            <Link to="/app/chat" className="mt-4 block text-sm font-medium text-[var(--orbe-blue)] hover:underline">
+              Ver outras sugestões
+            </Link>
+          </div>
+        </div>
       </section>
     </div>
   );
