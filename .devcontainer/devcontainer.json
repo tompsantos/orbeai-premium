@@ -1,0 +1,32 @@
+{
+  "name": "orbeAI premium preview",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm",
+  "containerEnv": {
+    "VITE_MOCK_MODE": "true",
+    "VITE_API_BASE_URL": ""
+  },
+  "forwardPorts": [8080],
+  "portsAttributes": {
+    "8080": {
+      "label": "orbeAI premium preview",
+      "onAutoForward": "openPreview",
+      "protocol": "http"
+    }
+  },
+  "postCreateCommand": "bash .devcontainer/setup-preview.sh",
+  "postStartCommand": "bash .devcontainer/start-preview.sh",
+  "hostRequirements": {
+    "cpus": 2,
+    "memory": "4gb",
+    "storage": "16gb"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "bradlc.vscode-tailwindcss",
+        "esbenp.prettier-vscode",
+        "dbaeumer.vscode-eslint"
+      ]
+    }
+  }
+}
