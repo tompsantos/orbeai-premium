@@ -4,6 +4,11 @@ A distribuição cognitiva premium da orbeOne.
 
 Este repositório une o produto funcional de `tompsantos/orbeai` ao runtime agêntico do `NousResearch/hermes-agent`, preservando a experiência, autenticação, governança e arquitetura multiusuário da orbeAI enquanto o Hermes fornece o núcleo de execução, ferramentas, contexto, sessões, skills e evolução procedural.
 
+## documentação oficial
+
+- [projeto-mãe · orbeAI premium](docs/projeto-orbeai-premium.pdf)
+- [roadmap vivo](ROADMAP.md)
+
 ## arquitetura
 
 ```text
