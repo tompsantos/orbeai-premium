@@ -8,9 +8,36 @@ on:
   pull_request:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
+  control-api-report:
+    if: github.event_name == 'pull_request' && github.head_ref == 'agent/transplant-orbeai-product' && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: services/control-api
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/transplant-orbeai-product
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: install
+        run: pip install -q -e ".[dev]"
+      - name: write lint report
+        run: ruff check app tests --output-format=concise > ../../docs/control-api-ruff-report.txt 2>&1 || true
+      - name: publish lint report
+        working-directory: .
+        run: |
+          git config user.name "orbeOne build bot"
+          git config user.email "buildbot@orbeone.com.br"
+          git add docs/control-api-ruff-report.txt
+          git commit -m "add control API lint diagnostic"
+          git push origin HEAD:agent/transplant-orbeai-product
+
   cognition:
     runs-on: ubuntu-24.04
     defaults:
