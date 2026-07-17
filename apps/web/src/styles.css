@@ -1,0 +1,297 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* orbeAI design system */
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-orbe-blue: var(--orbe-blue);
+  --color-orbe-cyan: var(--orbe-cyan);
+  --color-orbe-silver: var(--orbe-silver);
+  --color-orbe-graphite: var(--orbe-graphite);
+  --color-orbe-charcoal: var(--orbe-charcoal);
+  --color-orbe-platinum: var(--orbe-platinum);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --font-display: "Geist", "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+:root {
+  --radius: 0.875rem;
+
+  --background: oklch(0.985 0.004 250);
+  --foreground: oklch(0.18 0.02 250);
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.02 250);
+
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.02 250);
+
+  --primary: oklch(0.58 0.18 256);
+  --primary-foreground: oklch(0.99 0 0);
+
+  --secondary: oklch(0.96 0.01 250);
+  --secondary-foreground: oklch(0.22 0.03 256);
+
+  --muted: oklch(0.96 0.008 250);
+  --muted-foreground: oklch(0.5 0.02 250);
+
+  --accent: oklch(0.94 0.025 240);
+  --accent-foreground: oklch(0.22 0.03 256);
+
+  --destructive: oklch(0.6 0.22 25);
+  --destructive-foreground: oklch(0.99 0 0);
+
+  --success: oklch(0.65 0.16 155);
+  --warning: oklch(0.78 0.16 75);
+
+  --border: oklch(0.91 0.012 250);
+  --input: oklch(0.92 0.012 250);
+  --ring: oklch(0.58 0.18 256);
+
+  --orbe-blue: oklch(0.58 0.18 256);
+  --orbe-cyan: oklch(0.78 0.13 230);
+  --orbe-silver: oklch(0.85 0.012 250);
+  --orbe-graphite: oklch(0.32 0.02 256);
+  --orbe-charcoal: oklch(0.22 0.025 256);
+  --orbe-platinum: oklch(0.93 0.008 250);
+
+  --sidebar: oklch(0.99 0.003 250);
+  --sidebar-foreground: oklch(0.22 0.025 256);
+  --sidebar-border: oklch(0.92 0.012 250);
+  --sidebar-accent: oklch(0.95 0.015 250);
+
+  --gradient-orbe: linear-gradient(135deg, oklch(0.58 0.18 256) 0%, oklch(0.78 0.13 230) 60%, oklch(0.93 0.008 250) 100%);
+  --gradient-hero: radial-gradient(1200px 600px at 18% -5%, color-mix(in oklch, oklch(0.58 0.18 256) 16%, transparent), transparent 60%),
+                   radial-gradient(900px 520px at 95% 5%, color-mix(in oklch, oklch(0.78 0.13 230) 14%, transparent), transparent 55%);
+  --gradient-card: linear-gradient(180deg, color-mix(in oklch, white 82%, transparent), color-mix(in oklch, white 52%, transparent));
+  --glow-orbe: 0 0 0 1px color-mix(in oklch, var(--orbe-blue) 16%, transparent),
+               0 14px 48px -20px color-mix(in oklch, var(--orbe-blue) 40%, transparent);
+  --shadow-elegant: 0 1px 2px rgba(15,23,42,0.04), 0 10px 30px -12px rgba(15,23,42,0.10);
+  --shadow-soft: 0 1px 2px rgba(15,23,42,0.03), 0 3px 12px -6px rgba(15,23,42,0.07);
+  --shadow-xs: 0 1px 2px rgba(15,23,42,0.04);
+  --shadow-pop: 0 1px 2px rgba(15,23,42,0.05), 0 24px 60px -24px rgba(15,23,42,0.22);
+}
+
+.dark {
+  --background: oklch(0.16 0.02 256);
+  --foreground: oklch(0.96 0.005 250);
+
+  --card: oklch(0.21 0.025 256);
+  --card-foreground: oklch(0.96 0.005 250);
+
+  --popover: oklch(0.21 0.025 256);
+  --popover-foreground: oklch(0.96 0.005 250);
+
+  --primary: oklch(0.7 0.16 245);
+  --primary-foreground: oklch(0.14 0.02 256);
+
+  --secondary: oklch(0.26 0.025 256);
+  --secondary-foreground: oklch(0.96 0.005 250);
+
+  --muted: oklch(0.24 0.022 256);
+  --muted-foreground: oklch(0.7 0.02 250);
+
+  --accent: oklch(0.28 0.04 245);
+  --accent-foreground: oklch(0.96 0.005 250);
+
+  --destructive: oklch(0.65 0.21 25);
+  --destructive-foreground: oklch(0.99 0 0);
+
+  --success: oklch(0.7 0.15 155);
+  --warning: oklch(0.8 0.15 75);
+
+  --border: oklch(1 0 0 / 8%);
+  --input: oklch(1 0 0 / 12%);
+  --ring: oklch(0.7 0.16 245);
+
+  --sidebar: oklch(0.18 0.022 256);
+  --sidebar-foreground: oklch(0.92 0.008 250);
+  --sidebar-border: oklch(1 0 0 / 7%);
+  --sidebar-accent: oklch(0.25 0.03 250);
+
+  --gradient-card: linear-gradient(180deg, color-mix(in oklch, oklch(0.21 0.025 256) 80%, transparent), color-mix(in oklch, oklch(0.16 0.02 256) 60%, transparent));
+  --gradient-hero: radial-gradient(1200px 600px at 20% 0%, color-mix(in oklch, oklch(0.7 0.16 245) 28%, transparent), transparent 60%),
+                   radial-gradient(900px 500px at 90% 10%, color-mix(in oklch, oklch(0.78 0.13 230) 22%, transparent), transparent 55%);
+  --shadow-elegant: 0 1px 2px rgba(0,0,0,0.5), 0 14px 40px -14px rgba(0,0,0,0.6);
+  --shadow-soft: 0 1px 2px rgba(0,0,0,0.4), 0 4px 16px -8px rgba(0,0,0,0.5);
+  --shadow-xs: 0 1px 2px rgba(0,0,0,0.4);
+  --shadow-pop: 0 1px 2px rgba(0,0,0,0.5), 0 28px 70px -28px rgba(0,0,0,0.75);
+  --glow-orbe: 0 0 0 1px color-mix(in oklch, var(--orbe-blue) 22%, transparent),
+               0 14px 48px -20px color-mix(in oklch, var(--orbe-blue) 50%, transparent);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  html, body {
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    background-image: var(--gradient-hero);
+    background-attachment: fixed;
+  }
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+  /* Premium thin scrollbars */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklch, var(--foreground) 18%, transparent) transparent;
+  }
+  *::-webkit-scrollbar { width: 8px; height: 8px; }
+  *::-webkit-scrollbar-track { background: transparent; }
+  *::-webkit-scrollbar-thumb {
+    background: color-mix(in oklch, var(--foreground) 16%, transparent);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in oklch, var(--foreground) 28%, transparent);
+    background-clip: padding-box;
+  }
+  ::selection {
+    background: color-mix(in oklch, var(--orbe-blue) 24%, transparent);
+  }
+}
+
+@utility orbe-gradient-text {
+  background: var(--gradient-orbe);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@utility orbe-glass {
+  background: var(--gradient-card);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  border: 1px solid color-mix(in oklch, var(--border) 80%, transparent);
+  box-shadow: var(--shadow-soft);
+}
+
+@utility orbe-glow {
+  box-shadow: var(--glow-orbe);
+}
+
+@utility orbe-ring {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--orbe-blue) 30%, transparent);
+}
+
+@utility orbe-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+  transition: transform .25s cubic-bezier(0.16,1,0.3,1), box-shadow .25s ease, border-color .25s ease;
+}
+
+@utility orbe-card-hover {
+  &:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in oklch, var(--orbe-blue) 32%, var(--border));
+    box-shadow: var(--shadow-elegant);
+  }
+}
+
+/* Subtle surface — flatter than a card, for nested panels / list rows */
+@utility orbe-surface {
+  background: color-mix(in oklch, var(--card) 70%, transparent);
+  border: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
+  border-radius: var(--radius-md);
+}
+
+/* Tinted accent stripe used on selected items */
+@utility orbe-active {
+  position: relative;
+  background: color-mix(in oklch, var(--orbe-blue) 9%, var(--card));
+  border-color: color-mix(in oklch, var(--orbe-blue) 28%, var(--border));
+}
+
+/* Section eyebrow caps */
+@utility orbe-eyebrow {
+  font-size: 0.6875rem;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--muted-foreground);
+  font-weight: 600;
+}
+
+/* Gradient hairline divider */
+@utility orbe-hairline {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--border) 90%, transparent) 18%, color-mix(in oklch, var(--border) 90%, transparent) 82%, transparent);
+}
+
+@keyframes orbe-pulse {
+  0%, 100% { opacity: .55; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.04); }
+}
+@keyframes orbe-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@utility animate-orbe-fade {
+  animation: orbe-fade-in .35s ease both;
+}
+@utility animate-orbe-pulse {
+  animation: orbe-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes orbe-shimmer {
+  100% { transform: translateX(100%); }
+}
+@utility orbe-skeleton {
+  position: relative;
+  overflow: hidden;
+  background: color-mix(in oklch, var(--muted) 80%, transparent);
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--foreground) 6%, transparent), transparent);
+    animation: orbe-shimmer 1.6s infinite;
+  }
+}
