@@ -5,6 +5,7 @@ from app.routers import (
     artifacts,
     audit,
     auth,
+    chat_live,
     chat_send,
     chats,
     feature_flags,
@@ -30,6 +31,7 @@ router.include_router(memories.router, dependencies=protected_dependencies)
 router.include_router(chats.router, dependencies=protected_dependencies)
 router.include_router(messages.router, dependencies=protected_dependencies)
 router.include_router(chat_send.router, dependencies=protected_dependencies)
+router.include_router(chat_live.router, dependencies=protected_dependencies)
 router.include_router(model_runs.router, dependencies=protected_dependencies)
 router.include_router(audit.router, dependencies=protected_dependencies)
 router.include_router(feature_flags.router, dependencies=protected_dependencies)
