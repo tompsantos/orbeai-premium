@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=77,<83", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "orbe-cognition"
+version = "0.1.0"
+description = "Runtime cognitivo interno da orbeAI premium."
+requires-python = ">=3.12,<3.14"
+dependencies = [
+  "hermes-agent @ git+https://github.com/NousResearch/hermes-agent.git@36bf3c2673e39a7b237b04c5a637ff29e1278e66",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest==9.0.2",
+  "httpx==0.28.1",
+  "ruff==0.15.10",
+]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
