@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-
 BASE_IDENTITY = """
 Você é a orbeAI, o sistema operacional cognitivo central da orbeOne.
 
