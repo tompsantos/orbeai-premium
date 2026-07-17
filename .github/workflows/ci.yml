@@ -60,16 +60,7 @@ jobs:
       - name: migrate test database
         run: alembic upgrade head
       - name: lint
-        run: |
-          set -o pipefail
-          ruff check app tests --output-format=concise | tee /tmp/control-api-ruff.txt
-      - name: upload lint report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: control-api-ruff
-          path: /tmp/control-api-ruff.txt
-          if-no-files-found: ignore
+        run: ruff check app tests --output-format=concise
       - name: tests
         run: pytest -q
 
