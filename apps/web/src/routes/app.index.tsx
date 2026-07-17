@@ -101,6 +101,16 @@ function relativeDate(value?: string) {
   }
 }
 
+function SummaryBadge({ children, className }: { children: React.ReactNode; className: string }) {
+  return (
+    <span
+      className={`inline-flex min-w-max shrink-0 items-center whitespace-nowrap rounded-full px-2 py-1 text-[11px] font-medium leading-none ${className}`}
+    >
+      {children}
+    </span>
+  );
+}
+
 function Dashboard() {
   const [chats, setChats] = useState<Chat[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -225,28 +235,16 @@ function Dashboard() {
           </Link>
 
           <div className="mt-3 flex flex-wrap gap-2">
-            <Link
-              to="/app/chat"
-              className="inline-flex items-center gap-2 rounded-full border border-border/80 bg-background/75 px-4 py-2 text-xs font-medium transition hover:bg-accent sm:text-sm"
-            >
+            <Link to="/app/chat" className="inline-flex items-center gap-2 rounded-full border border-border/80 bg-background/75 px-4 py-2 text-xs font-medium transition hover:bg-accent sm:text-sm">
               <Paperclip className="size-4" /> Anexar arquivo
             </Link>
-            <Link
-              to="/app/chat"
-              className="inline-flex items-center gap-2 rounded-full border border-border/80 bg-background/75 px-4 py-2 text-xs font-medium transition hover:bg-accent sm:text-sm"
-            >
+            <Link to="/app/chat" className="inline-flex items-center gap-2 rounded-full border border-border/80 bg-background/75 px-4 py-2 text-xs font-medium transition hover:bg-accent sm:text-sm">
               <Mic className="size-4" /> Usar voz
             </Link>
-            <Link
-              to="/app/research"
-              className="inline-flex items-center gap-2 rounded-full border border-border/80 bg-background/75 px-4 py-2 text-xs font-medium transition hover:bg-accent sm:text-sm"
-            >
+            <Link to="/app/research" className="inline-flex items-center gap-2 rounded-full border border-border/80 bg-background/75 px-4 py-2 text-xs font-medium transition hover:bg-accent sm:text-sm">
               <Search className="size-4" /> Pesquisa profunda
             </Link>
-            <Link
-              to="/app/chat"
-              className="inline-flex items-center gap-2 rounded-full border border-border/80 bg-background/75 px-4 py-2 text-xs font-medium transition hover:bg-accent sm:text-sm"
-            >
+            <Link to="/app/chat" className="inline-flex items-center gap-2 rounded-full border border-border/80 bg-background/75 px-4 py-2 text-xs font-medium transition hover:bg-accent sm:text-sm">
               <Sparkles className="size-4" /> Inspirar-me
             </Link>
           </div>
@@ -257,11 +255,7 @@ function Dashboard() {
         <h2 className="text-base font-semibold tracking-tight">Escolha um caminho</h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
           {exploreItems.map(({ title, description, icon: Icon, to, shellClass, iconClass }) => (
-            <Link
-              key={title}
-              to={to}
-              className={`group min-h-36 rounded-2xl border p-4 transition hover:-translate-y-0.5 hover:shadow-md ${shellClass}`}
-            >
+            <Link key={title} to={to} className={`group min-h-36 rounded-2xl border p-4 transition hover:-translate-y-0.5 hover:shadow-md ${shellClass}`}>
               <div className={`flex size-9 items-center justify-center rounded-xl ${iconClass}`}>
                 <Icon className="size-5" />
               </div>
@@ -276,55 +270,31 @@ function Dashboard() {
         <div className="rounded-2xl border border-border/70 bg-card p-4 sm:p-5">
           <div className="flex items-center justify-between gap-3">
             <h2 className="font-semibold">Continuar de onde parou</h2>
-            <Link to="/app/chat" className="text-sm font-medium text-[var(--orbe-blue)] hover:underline">
-              Ver tudo
-            </Link>
+            <Link to="/app/chat" className="text-sm font-medium text-[var(--orbe-blue)] hover:underline">Ver tudo</Link>
           </div>
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <Link
-              to="/app/chat"
-              className="group flex min-h-16 items-center gap-3 rounded-xl border border-border/60 bg-background/70 p-3 shadow-sm transition hover:border-blue-200 hover:shadow-md"
-            >
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
-                <MessageSquare className="size-5" />
-              </span>
+            <Link to="/app/chat" className="group flex min-h-16 items-center gap-3 rounded-xl border border-border/60 bg-background/70 p-3 shadow-sm transition hover:border-blue-200 hover:shadow-md">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-blue-600"><MessageSquare className="size-5" /></span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-semibold">
-                  {latestChat?.title || "Comece uma conversa com a orbeAI"}
-                </span>
-                <span className="mt-0.5 block text-xs text-muted-foreground">
-                  Conversa · {relativeDate(latestChat?.updatedAt)}
-                </span>
+                <span className="block truncate text-sm font-semibold">{latestChat?.title || "Comece uma conversa com a orbeAI"}</span>
+                <span className="mt-0.5 block text-xs text-muted-foreground">Conversa · {relativeDate(latestChat?.updatedAt)}</span>
               </span>
               <ArrowRight className="size-4 text-muted-foreground transition group-hover:translate-x-0.5" />
             </Link>
 
             {latestProject ? (
-              <Link
-                to="/app/projects/$id"
-                params={{ id: latestProject.id }}
-                className="group flex min-h-16 items-center gap-3 rounded-xl border border-border/60 bg-background/70 p-3 shadow-sm transition hover:border-violet-200 hover:shadow-md"
-              >
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
-                  <FolderKanban className="size-5" />
-                </span>
+              <Link to="/app/projects/$id" params={{ id: latestProject.id }} className="group flex min-h-16 items-center gap-3 rounded-xl border border-border/60 bg-background/70 p-3 shadow-sm transition hover:border-violet-200 hover:shadow-md">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-600"><FolderKanban className="size-5" /></span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold">{latestProject.name}</span>
-                  <span className="mt-0.5 block text-xs text-muted-foreground">
-                    Projeto · {relativeDate(latestProject.updatedAt)}
-                  </span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">Projeto · {relativeDate(latestProject.updatedAt)}</span>
                 </span>
                 <ArrowRight className="size-4 text-muted-foreground transition group-hover:translate-x-0.5" />
               </Link>
             ) : (
-              <Link
-                to="/app/projects"
-                className="group flex min-h-16 items-center gap-3 rounded-xl border border-border/60 bg-background/70 p-3 shadow-sm transition hover:border-violet-200 hover:shadow-md"
-              >
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
-                  <FolderKanban className="size-5" />
-                </span>
+              <Link to="/app/projects" className="group flex min-h-16 items-center gap-3 rounded-xl border border-border/60 bg-background/70 p-3 shadow-sm transition hover:border-violet-200 hover:shadow-md">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-600"><FolderKanban className="size-5" /></span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold">Crie seu primeiro projeto</span>
                   <span className="mt-0.5 block text-xs text-muted-foreground">Organize uma ideia em um só lugar</span>
@@ -333,17 +303,10 @@ function Dashboard() {
               </Link>
             )}
 
-            <Link
-              to="/app/artifacts"
-              className="group flex min-h-16 items-center gap-3 rounded-xl border border-border/60 bg-background/70 p-3 shadow-sm transition hover:border-emerald-200 hover:shadow-md sm:col-span-2 sm:max-w-[calc(50%-0.375rem)]"
-            >
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
-                <FileText className="size-5" />
-              </span>
+            <Link to="/app/artifacts" className="group flex min-h-16 items-center gap-3 rounded-xl border border-border/60 bg-background/70 p-3 shadow-sm transition hover:border-emerald-200 hover:shadow-md sm:col-span-2 sm:max-w-[calc(50%-0.375rem)]">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600"><FileText className="size-5" /></span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-semibold">
-                  {latestArtifact?.title || "Sua biblioteca começa aqui"}
-                </span>
+                <span className="block truncate text-sm font-semibold">{latestArtifact?.title || "Sua biblioteca começa aqui"}</span>
                 <span className="mt-0.5 block text-xs text-muted-foreground">
                   {latestArtifact ? `${latestArtifact.kind} · ${relativeDate(latestArtifact.updatedAt)}` : "Crie e guarde conteúdos importantes"}
                 </span>
@@ -356,26 +319,20 @@ function Dashboard() {
         <div className="rounded-2xl border border-border/70 bg-card p-4 sm:p-5">
           <div className="flex items-center justify-between gap-3">
             <h2 className="font-semibold">Atividade recente</h2>
-            <Link to="/app/admin" className="text-sm font-medium text-[var(--orbe-blue)] hover:underline">
-              Ver tudo
-            </Link>
+            <Link to="/app/admin" className="text-sm font-medium text-[var(--orbe-blue)] hover:underline">Ver tudo</Link>
           </div>
 
           <div className="mt-4 space-y-1">
             {activities.length > 0 ? (
               activities.map(({ key, icon: Icon, iconClass, label, date }) => (
                 <div key={key} className="flex items-center gap-3 rounded-xl px-2 py-2.5 transition hover:bg-accent/45">
-                  <span className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${iconClass}`}>
-                    <Icon className="size-4" />
-                  </span>
+                  <span className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${iconClass}`}><Icon className="size-4" /></span>
                   <span className="min-w-0 flex-1 truncate text-sm text-foreground/80">{label}</span>
                   <span className="shrink-0 text-xs text-muted-foreground">{relativeDate(date)}</span>
                 </div>
               ))
             ) : (
-              <div className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground">
-                Suas conversas, arquivos e projetos recentes aparecerão aqui.
-              </div>
+              <div className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground">Suas conversas, arquivos e projetos recentes aparecerão aqui.</div>
             )}
           </div>
         </div>
@@ -383,16 +340,12 @@ function Dashboard() {
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Link to="/app/memory" className="rounded-2xl border border-border/70 bg-card p-5 transition hover:shadow-md">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <span className="flex size-9 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
-                <Brain className="size-5" />
-              </span>
-              <h2 className="font-semibold">Memórias</h2>
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-600"><Brain className="size-4" /></span>
+              <h2 className="truncate text-sm font-semibold sm:text-base">Memórias</h2>
             </div>
-            <span className="rounded-full bg-violet-100 px-2.5 py-1 text-xs font-medium text-violet-700">
-              {memories.length} pendentes
-            </span>
+            <SummaryBadge className="bg-violet-100 text-violet-700">{memories.length} pendentes</SummaryBadge>
           </div>
           <div className="mt-5 space-y-3">
             {memories.slice(0, 3).map((memory) => (
@@ -407,16 +360,12 @@ function Dashboard() {
         </Link>
 
         <Link to="/app/projects" className="rounded-2xl border border-border/70 bg-card p-5 transition hover:shadow-md">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <span className="flex size-9 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
-                <FolderKanban className="size-5" />
-              </span>
-              <h2 className="font-semibold">Projetos</h2>
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-600"><FolderKanban className="size-4" /></span>
+              <h2 className="truncate text-sm font-semibold sm:text-base">Projetos</h2>
             </div>
-            <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700">
-              {activeProjects} ativos
-            </span>
+            <SummaryBadge className="bg-blue-100 text-blue-700">{activeProjects} ativos</SummaryBadge>
           </div>
           <div className="mt-5 space-y-3">
             {projects.slice(0, 3).map((project) => (
@@ -431,30 +380,17 @@ function Dashboard() {
         </Link>
 
         <Link to="/app/artifacts" className="rounded-2xl border border-border/70 bg-card p-5 transition hover:shadow-md">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <span className="flex size-9 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600">
-                <Library className="size-5" />
-              </span>
-              <h2 className="font-semibold">Biblioteca</h2>
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600"><Library className="size-4" /></span>
+              <h2 className="truncate text-sm font-semibold sm:text-base">Biblioteca</h2>
             </div>
-            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
-              {artifacts.length} itens
-            </span>
+            <SummaryBadge className="bg-slate-100 text-slate-700">{artifacts.length} itens</SummaryBadge>
           </div>
           <div className="mt-5 space-y-3 text-sm">
-            <div className="flex items-center justify-between gap-3">
-              <span className="flex items-center gap-2 text-foreground/80"><FileText className="size-4 text-muted-foreground" /> Documentos</span>
-              <span className="text-xs text-muted-foreground">{documentCount}</span>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <span className="flex items-center gap-2 text-foreground/80"><BookOpen className="size-4 text-muted-foreground" /> Planos e playbooks</span>
-              <span className="text-xs text-muted-foreground">{planCount}</span>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <span className="flex items-center gap-2 text-foreground/80"><Library className="size-4 text-muted-foreground" /> Outros itens</span>
-              <span className="text-xs text-muted-foreground">{otherArtifactCount}</span>
-            </div>
+            <div className="flex items-center justify-between gap-3"><span className="flex items-center gap-2 text-foreground/80"><FileText className="size-4 text-muted-foreground" /> Documentos</span><span className="text-xs text-muted-foreground">{documentCount}</span></div>
+            <div className="flex items-center justify-between gap-3"><span className="flex items-center gap-2 text-foreground/80"><BookOpen className="size-4 text-muted-foreground" /> Planos e playbooks</span><span className="text-xs text-muted-foreground">{planCount}</span></div>
+            <div className="flex items-center justify-between gap-3"><span className="flex items-center gap-2 text-foreground/80"><Library className="size-4 text-muted-foreground" /> Outros itens</span><span className="text-xs text-muted-foreground">{otherArtifactCount}</span></div>
           </div>
           <div className="mt-5 text-sm font-medium text-[var(--orbe-blue)]">Ver tudo</div>
         </Link>
@@ -462,25 +398,14 @@ function Dashboard() {
         <div className="relative overflow-hidden rounded-2xl border border-amber-200/80 bg-[linear-gradient(145deg,rgba(255,251,235,0.95),rgba(255,247,237,0.95))] p-5 shadow-[0_18px_40px_-30px_rgba(245,158,11,0.65)]">
           <div className="pointer-events-none absolute -bottom-20 -right-16 size-48 rounded-full bg-amber-200/35 blur-2xl" />
           <div className="relative">
-            <div className="flex items-center gap-3">
-              <Sparkles className="size-5 text-amber-500" />
-              <h2 className="font-semibold">Sugestão para você</h2>
-            </div>
+            <div className="flex items-center gap-3"><Sparkles className="size-5 text-amber-500" /><h2 className="font-semibold">Sugestão para você</h2></div>
             <p className="mt-5 text-sm leading-6 text-foreground/75">
-              {latestChat
-                ? `Que tal continuar sua conversa sobre “${latestChat.title}”? Todo o contexto está preservado.`
-                : "Comece uma conversa e a orbeAI aprenderá quais assuntos você quer retomar com mais facilidade."}
+              {latestChat ? `Que tal continuar sua conversa sobre “${latestChat.title}”? Todo o contexto está preservado.` : "Comece uma conversa e a orbeAI aprenderá quais assuntos você quer retomar com mais facilidade."}
             </p>
-            <Link
-              to="/app/chat"
-              className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
-            >
-              {latestChat ? "Continuar conversa" : "Começar conversa"}
-              <ArrowRight className="size-4" />
+            <Link to="/app/chat" className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800">
+              {latestChat ? "Continuar conversa" : "Começar conversa"}<ArrowRight className="size-4" />
             </Link>
-            <Link to="/app/chat" className="mt-4 block text-sm font-medium text-[var(--orbe-blue)] hover:underline">
-              Ver outras sugestões
-            </Link>
+            <Link to="/app/chat" className="mt-4 block text-sm font-medium text-[var(--orbe-blue)] hover:underline">Ver outras sugestões</Link>
           </div>
         </div>
       </section>
