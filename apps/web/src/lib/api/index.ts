@@ -11,6 +11,7 @@ export { memoryService } from "@/lib/api/services/memoryService";
 export { agentService } from "@/lib/api/services/agentService";
 export { integrationService } from "@/lib/api/services/integrationService";
 export { modelService } from "@/lib/api/services/modelService";
+export { providerCredentialService } from "@/lib/api/services/providerCredentialService";
 export { researchService } from "@/lib/api/services/researchService";
 export { adminService } from "@/lib/api/services/adminService";
 export { orbeOneService } from "@/lib/api/services/orbeOneService";
