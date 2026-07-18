@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from app.core.config import Settings, get_settings
+from app.db.session import SessionLocal
+from app.services.bootstrap import get_or_create_default_workspace
 from app.services.provider_credentials import (
     CredentialDecryptionError,
     provider_definition,
@@ -80,6 +82,16 @@ class ProviderRegistry:
         return [provider.persisted_payload() for provider in self.providers.values()]
 
 
+def resolve_registry_workspace_id(workspace_id: str | None) -> str | None:
+    if workspace_id:
+        return workspace_id
+    try:
+        with SessionLocal() as db:
+            return get_or_create_default_workspace(db).id
+    except Exception:
+        return None
+
+
 def _real_provider_state(
     *,
     globally_enabled: bool,
@@ -148,6 +160,7 @@ def build_provider_registry(
     workspace_id: str | None = None,
 ) -> ProviderRegistry:
     settings = settings or get_settings()
+    workspace_id = resolve_registry_workspace_id(workspace_id)
 
     return ProviderRegistry(
         providers={
