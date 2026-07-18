@@ -1,12 +1,15 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Literal
 
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from app.models import KnowledgeMaterial, ResearchReport
+from app.db.session import SessionLocal
+from app.models import Chat, KnowledgeMaterial, ResearchReport
+from app.services.audit import write_audit_log
+from app.services.feature_flags import is_feature_enabled
 from app.services.memory_context import compact, tokenize
 
 KnowledgeSourceType = Literal["research_report", "knowledge_material"]
@@ -22,6 +25,11 @@ class KnowledgeContextSource:
     project_id: str | None
     excerpt: str
     metadata_only: bool = False
+
+    def public_payload(self) -> dict[str, str | float | bool | None]:
+        payload = asdict(self)
+        payload.pop("excerpt", None)
+        return payload
 
 
 def _base_score(query: str, title: str, body: str) -> float:
@@ -50,7 +58,11 @@ def _project_boost(item_project_id: str | None, project_id: str | None) -> float
     return 0.0
 
 
-def _report_source(report: ResearchReport, query: str, project_id: str | None) -> KnowledgeContextSource | None:
+def _report_source(
+    report: ResearchReport,
+    query: str,
+    project_id: str | None,
+) -> KnowledgeContextSource | None:
     body = " ".join(
         part
         for part in [
@@ -93,7 +105,10 @@ def _material_source(
     score += min(max(material.confidence, 0.0), 1.0) * 0.05
 
     meta = material.meta or {}
-    metadata_only = meta.get("content_stored") is False or meta.get("content_available") is False
+    metadata_only = (
+        meta.get("content_stored") is False
+        or meta.get("content_available") is False
+    )
 
     return KnowledgeContextSource(
         source_id=material.id,
@@ -175,3 +190,57 @@ def build_knowledge_context(sources: list[KnowledgeContextSource]) -> str | None
         lines.append(item)
 
     return "\n".join(lines)
+
+
+def resolve_knowledge_context(
+    *,
+    workspace_id: str,
+    chat_id: str,
+    query: str,
+    request_id: str | None = None,
+) -> tuple[str | None, list[KnowledgeContextSource]]:
+    db = SessionLocal()
+    try:
+        chat = db.scalar(
+            select(Chat)
+            .where(Chat.id == chat_id)
+            .where(Chat.workspace_id == workspace_id)
+        )
+        if chat is None:
+            return None, []
+
+        if not is_feature_enabled(
+            db=db,
+            workspace_id=workspace_id,
+            key="knowledge_context",
+            default=True,
+        ):
+            return None, []
+
+        sources = select_relevant_knowledge(
+            db=db,
+            workspace_id=workspace_id,
+            project_id=chat.project_id,
+            query=query,
+        )
+        context = build_knowledge_context(sources)
+
+        if sources:
+            write_audit_log(
+                db=db,
+                workspace_id=workspace_id,
+                action="knowledge.context.select",
+                resource_type="chat",
+                resource_id=chat_id,
+                request_id=request_id,
+                meta={
+                    "project_id": chat.project_id,
+                    "source_count": len(sources),
+                    "sources": [source.public_payload() for source in sources],
+                },
+            )
+            db.commit()
+
+        return context, sources
+    finally:
+        db.close()
