@@ -12,6 +12,10 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  nitro: {
+    // Docker executes .output/server/index.mjs as a long-lived Node HTTP server.
+    preset: "node",
+  },
   vite: {
     server: {
       host: "0.0.0.0",
