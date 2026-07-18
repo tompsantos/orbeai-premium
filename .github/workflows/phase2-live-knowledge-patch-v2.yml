@@ -19,7 +19,7 @@ jobs:
           ref: agent/phase2-live-knowledge-trace
           fetch-depth: 0
       - name: apply corrected patch
-        run: python scripts/phase2_live_knowledge_patch.py
+        run: python3 scripts/phase2_live_knowledge_patch.py
       - name: commit patch
         run: |
           git config user.name "orbeone-lab-01"
