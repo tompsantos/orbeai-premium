@@ -5,7 +5,11 @@ from time import perf_counter
 
 from app.core.config import get_settings
 from app.services.orbe_router import ExecutionPlan, ExecutionStrategy
-from app.services.provider_registry import ProviderRegistry, build_provider_registry
+from app.services.provider_registry import (
+    ProviderRegistry,
+    build_provider_registry,
+    resolve_registry_workspace_id,
+)
 from app.services.providers.real import ProviderExecutionResult, execute_provider
 
 
@@ -64,6 +68,7 @@ def execute_provider_plan(
         raise ValueError("gateway direto recebeu plano de outra estratégia")
 
     settings = get_settings()
+    workspace_id = resolve_registry_workspace_id(workspace_id)
     registry = registry or build_provider_registry(
         settings,
         real_providers_enabled=real_providers_enabled,
