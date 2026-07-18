@@ -58,6 +58,7 @@ def execute_provider_plan(
     knowledge_context: str | None = None,
     real_providers_enabled: bool = True,
     registry: ProviderRegistry | None = None,
+    workspace_id: str | None = None,
 ) -> GatewayExecution:
     if plan.strategy is not ExecutionStrategy.DIRECT_PROVIDER:
         raise ValueError("gateway direto recebeu plano de outra estratégia")
@@ -66,6 +67,7 @@ def execute_provider_plan(
     registry = registry or build_provider_registry(
         settings,
         real_providers_enabled=real_providers_enabled,
+        workspace_id=workspace_id,
     )
     attempts: list[ProviderAttempt] = []
 
@@ -95,6 +97,7 @@ def execute_provider_plan(
                     model_preference=model_preference,
                     memory_context=memory_context,
                     knowledge_context=knowledge_context,
+                    workspace_id=workspace_id,
                 )
             except Exception as exc:
                 attempts.append(
