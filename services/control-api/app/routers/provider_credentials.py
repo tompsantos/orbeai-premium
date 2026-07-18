@@ -1,3 +1,4 @@
+# ruff: noqa: I001
 from time import perf_counter
 
 from app.db.session import get_db
