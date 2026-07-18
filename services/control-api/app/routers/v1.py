@@ -16,6 +16,7 @@ from app.routers import (
     model_runs,
     orbe_router,
     projects,
+    provider_credentials,
     workspace,
 )
 
@@ -38,6 +39,7 @@ router.include_router(model_runs.router, dependencies=protected_dependencies)
 router.include_router(audit.router, dependencies=protected_dependencies)
 router.include_router(feature_flags.router, dependencies=protected_dependencies)
 router.include_router(model_providers.router, dependencies=protected_dependencies)
+router.include_router(provider_credentials.router, dependencies=protected_dependencies)
 router.include_router(orbe_router.router, dependencies=protected_dependencies)
 
 
