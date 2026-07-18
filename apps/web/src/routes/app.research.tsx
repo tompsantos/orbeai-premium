@@ -33,10 +33,6 @@ export const Route = createFileRoute("/app/research")({
   component: KnowledgePage,
 });
 
-type KnowledgeMaterial = ResearchSource & {
-  addedNow?: boolean;
-};
-
 function materialKindLabel(kind: ResearchSource["kind"]) {
   if (kind === "web") return "site";
   if (kind === "arquivo") return "arquivo";
@@ -54,16 +50,21 @@ function MaterialIcon({ kind }: { kind: ResearchSource["kind"] }) {
 function KnowledgePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [reports, setReports] = useState<ResearchReport[]>([]);
+  const [materials, setMaterials] = useState<ResearchSource[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [question, setQuestion] = useState("");
   const [search, setSearch] = useState("");
   const [running, setRunning] = useState(false);
-  const [addedMaterials, setAddedMaterials] = useState<KnowledgeMaterial[]>([]);
+  const [lastAddedId, setLastAddedId] = useState<string | null>(null);
 
   async function refresh(selectId?: string) {
-    const list = await researchService.list();
-    setReports(list);
-    setActiveId(selectId ?? activeId ?? list[0]?.id ?? null);
+    const [reportList, materialList] = await Promise.all([
+      researchService.list(),
+      researchService.listMaterials(),
+    ]);
+    setReports(reportList);
+    setMaterials(materialList);
+    setActiveId(selectId ?? activeId ?? reportList[0]?.id ?? null);
   }
 
   useEffect(() => {
@@ -72,25 +73,14 @@ function KnowledgePage() {
 
   const active = reports.find((report) => report.id === activeId) ?? null;
 
-  const sourceMaterials = useMemo(() => {
-    const unique = new Map<string, KnowledgeMaterial>();
-
-    reports.forEach((report) => {
-      report.sources.forEach((source) => {
-        if (!unique.has(source.id)) unique.set(source.id, source);
-      });
-    });
-
-    return Array.from(unique.values());
-  }, [reports]);
-
-  const materials = [...addedMaterials, ...sourceMaterials];
-  const filteredMaterials = materials.filter((material) => {
+  const filteredMaterials = useMemo(() => {
     const query = search.trim().toLowerCase();
-    if (!query) return true;
+    if (!query) return materials;
 
-    return `${material.title} ${material.excerpt}`.toLowerCase().includes(query);
-  });
+    return materials.filter((material) =>
+      `${material.title} ${material.excerpt}`.toLowerCase().includes(query),
+    );
+  }, [materials, search]);
 
   const ongoing = reports.filter((report) => report.status === "em andamento").length;
   const completed = reports.filter((report) => report.status === "concluído").length;
@@ -99,34 +89,42 @@ function KnowledgePage() {
     if (!question.trim()) return;
 
     setRunning(true);
-
     try {
       const created = await researchService.create({ question: question.trim() });
-      await new Promise((resolve) => setTimeout(resolve, 700));
-      await researchService.update(created.id, { status: "em andamento" });
       setQuestion("");
       await refresh(created.id);
-      toast.success("Pesquisa iniciada", {
-        description: "A orbeAI está organizando as melhores fontes para essa pergunta.",
+      toast.success("Pesquisa salva", {
+        description:
+          "O plano ficou persistido como rascunho. A execução automática será conectada no próximo bloco.",
       });
     } finally {
       setRunning(false);
     }
   }
 
-  function addMaterial(file: File) {
-    const material: KnowledgeMaterial = {
-      id: `upload_${Date.now()}`,
+  async function addMaterial(file: File) {
+    const sizeKb = Math.max(1, Math.round(file.size / 1024));
+    const created = await researchService.createMaterial({
       title: file.name,
       kind: "arquivo",
-      excerpt: `Material enviado agora · ${Math.max(1, Math.round(file.size / 1024))} KB`,
+      excerpt: `Referência persistida · ${sizeKb} KB · conteúdo do arquivo ainda não enviado`,
       confidence: 1,
-      addedNow: true,
-    };
+      sourceType: "file-metadata",
+      sourceProduct: "orbeAI",
+      sourceEntityId: file.name,
+      meta: {
+        filename: file.name,
+        size_bytes: file.size,
+        mime_type: file.type || null,
+        content_persisted: false,
+      },
+    });
 
-    setAddedMaterials((current) => [material, ...current]);
-    toast.success("Material adicionado à prévia", {
-      description: "Ele já aparece na sua área de conhecimento.",
+    setLastAddedId(created.id);
+    setMaterials(await researchService.listMaterials());
+    toast.success("Referência salva", {
+      description:
+        "Nome e metadados foram persistidos. O conteúdo do arquivo ainda não foi enviado nesta etapa.",
     });
   }
 
@@ -136,7 +134,7 @@ function KnowledgePage() {
     const markdown = [
       `# ${active.question}`,
       "",
-      active.summary || "Pesquisa ainda em andamento.",
+      active.summary || "Pesquisa ainda sem síntese.",
       "",
       "## Fontes",
       ...active.sources.map((source) => `- ${source.title}`),
@@ -157,15 +155,20 @@ function KnowledgePage() {
   async function saveToLibrary() {
     if (!active) return;
 
-    const markdown = `# ${active.question}\n\n${active.summary || "Pesquisa ainda em andamento."}\n\n## Pontos para conferir\n${active.risks.map((risk) => `- ${risk}`).join("\n")}`;
+    const markdown = `# ${active.question}\n\n${active.summary || "Pesquisa ainda sem síntese."}\n\n## Pontos para conferir\n${active.risks.map((risk) => `- ${risk}`).join("\n")}`;
 
     await artifactService.create({
       title: active.question.slice(0, 80),
       kind: "relatório",
       content: markdown,
+      sourceType: "research",
+      sourceProduct: "orbeAI",
+      sourceEntityId: active.id,
     });
 
-    toast.success("Salvo na Biblioteca");
+    toast.success("Salvo na Biblioteca", {
+      description: "O item mantém a ligação com esta pesquisa.",
+    });
   }
 
   return (
@@ -176,7 +179,9 @@ function KnowledgePage() {
             <div className="mb-5 flex size-11 items-center justify-center rounded-2xl border border-blue-100 bg-white shadow-sm">
               <OrbeMark size={23} />
             </div>
-            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">conhecimento</div>
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">
+              conhecimento
+            </div>
             <h1 className="mt-2 max-w-2xl text-3xl font-semibold tracking-tight md:text-4xl">
               tudo que ajuda a orbeAI a entender melhor o que importa para você.
             </h1>
@@ -207,23 +212,37 @@ function KnowledgePage() {
                 disabled={!question.trim() || running}
                 aria-label="Pesquisar"
               >
-                {running ? <Loader2 className="size-4 animate-spin" /> : <ArrowRight className="size-4" />}
+                {running ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <ArrowRight className="size-4" />
+                )}
               </Button>
             </div>
             <p className="mt-2 text-[11px] leading-4 text-muted-foreground">
-              A orbeAI decide quando usar seus materiais, fontes conectadas ou pesquisa externa.
+              Pesquisas e referências já ficam salvas. O uso automático nas conversas será conectado em uma etapa seguinte.
             </p>
           </div>
         </div>
       </section>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <StatCard value={materials.length} label="materiais disponíveis" icon={<BookOpen className="size-4" />} />
+        <StatCard
+          value={materials.length}
+          label="materiais disponíveis"
+          icon={<BookOpen className="size-4" />}
+        />
         <StatCard value={reports.length} label="pesquisas" icon={<Search className="size-4" />} />
         <StatCard
           value={ongoing || completed}
           label={ongoing > 0 ? "em andamento" : "concluídas"}
-          icon={ongoing > 0 ? <Loader2 className="size-4" /> : <CheckCircle2 className="size-4" />}
+          icon={
+            ongoing > 0 ? (
+              <Loader2 className="size-4" />
+            ) : (
+              <CheckCircle2 className="size-4" />
+            )
+          }
         />
       </div>
 
@@ -233,7 +252,7 @@ function KnowledgePage() {
             <div>
               <h2 className="text-lg font-semibold">Seus materiais</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Arquivos e fontes que podem ser usados quando forem relevantes.
+                Referências de arquivos e fontes organizadas para uso futuro.
               </p>
             </div>
             <div className="flex gap-2">
@@ -243,7 +262,7 @@ function KnowledgePage() {
                 className="hidden"
                 onChange={(event) => {
                   const file = event.target.files?.[0];
-                  if (file) addMaterial(file);
+                  if (file) void addMaterial(file);
                   event.target.value = "";
                 }}
               />
@@ -270,7 +289,7 @@ function KnowledgePage() {
                 title={materials.length === 0 ? "Nenhum material ainda" : "Nada encontrado"}
                 description={
                   materials.length === 0
-                    ? "Adicione um arquivo ou faça uma pesquisa para começar a construir seu conhecimento."
+                    ? "Adicione a referência de um arquivo para começar a construir seu conhecimento."
                     : "Tente buscar por outro nome ou assunto."
                 }
                 action={
@@ -295,8 +314,10 @@ function KnowledgePage() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
-                        <h3 className="line-clamp-2 text-sm font-medium leading-5">{material.title}</h3>
-                        {material.addedNow && <Pill tone="success">novo</Pill>}
+                        <h3 className="line-clamp-2 text-sm font-medium leading-5">
+                          {material.title}
+                        </h3>
+                        {material.id === lastAddedId && <Pill tone="success">novo</Pill>}
                       </div>
                       <p className="mt-1.5 line-clamp-2 text-xs leading-5 text-muted-foreground">
                         {material.excerpt}
@@ -317,7 +338,7 @@ function KnowledgePage() {
             <div>
               <h2 className="text-lg font-semibold">Pesquisas recentes</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Perguntas que a orbeAI está investigando para você.
+                Perguntas salvas para investigação e síntese.
               </p>
             </div>
             <Button variant="ghost" size="icon" asChild>
@@ -331,7 +352,9 @@ function KnowledgePage() {
             <div className="mt-5 rounded-xl border border-dashed border-border p-6 text-center">
               <Search className="mx-auto size-5 text-muted-foreground" />
               <div className="mt-2 text-sm font-medium">Nenhuma pesquisa ainda</div>
-              <p className="mt-1 text-xs text-muted-foreground">Faça uma pergunta no topo da página para começar.</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Faça uma pergunta no topo da página para começar.
+              </p>
             </div>
           ) : (
             <div className="mt-4 space-y-2">
@@ -348,7 +371,9 @@ function KnowledgePage() {
                   )}
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div className="line-clamp-2 text-sm font-medium leading-5">{report.question}</div>
+                    <div className="line-clamp-2 text-sm font-medium leading-5">
+                      {report.question}
+                    </div>
                     <span
                       className={cn(
                         "mt-1 size-2 shrink-0 rounded-full",
@@ -358,7 +383,12 @@ function KnowledgePage() {
                   </div>
                   <div className="mt-2 flex items-center justify-between gap-3 text-[11px] text-muted-foreground">
                     <span>{report.sources.length} fontes</span>
-                    <span>{formatDistanceToNow(new Date(report.updatedAt), { addSuffix: true, locale: ptBR })}</span>
+                    <span>
+                      {formatDistanceToNow(new Date(report.updatedAt), {
+                        addSuffix: true,
+                        locale: ptBR,
+                      })}
+                    </span>
                   </div>
                 </button>
               ))}
@@ -376,7 +406,9 @@ function KnowledgePage() {
               </div>
               <h2 className="mt-2 text-xl font-semibold tracking-tight">{active.question}</h2>
               <div className="mt-2 flex flex-wrap gap-2">
-                <Pill tone={active.status === "concluído" ? "success" : "warn"}>{active.status}</Pill>
+                <Pill tone={active.status === "concluído" ? "success" : "warn"}>
+                  {active.status}
+                </Pill>
                 <Pill tone="muted">{active.sources.length} fontes encontradas</Pill>
               </div>
             </div>
@@ -394,7 +426,8 @@ function KnowledgePage() {
             <div className="p-5 md:p-6">
               <h3 className="text-sm font-semibold">O que a orbeAI encontrou</h3>
               <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-foreground/90">
-                {active.summary || "A pesquisa ainda está sendo organizada. Os resultados aparecerão aqui quando a síntese estiver pronta."}
+                {active.summary ||
+                  "Esta pesquisa está salva como rascunho. A síntese aparecerá aqui quando a execução cognitiva for conectada."}
               </p>
 
               {active.risks.length > 0 && (
@@ -420,18 +453,25 @@ function KnowledgePage() {
 
               {active.sources.length === 0 ? (
                 <div className="mt-4 rounded-xl border border-dashed border-border p-4 text-xs text-muted-foreground">
-                  As fontes aparecerão aqui conforme a pesquisa avançar.
+                  As fontes aparecerão aqui quando a execução da pesquisa for conectada.
                 </div>
               ) : (
                 <div className="mt-4 space-y-3">
                   {active.sources.map((source) => (
-                    <article key={source.id} className="rounded-xl border border-border/60 bg-card p-3.5">
+                    <article
+                      key={source.id}
+                      className="rounded-xl border border-border/60 bg-card p-3.5"
+                    >
                       <div className="flex items-center gap-2 text-blue-700">
                         <MaterialIcon kind={source.kind} />
-                        <span className="text-[11px] font-medium">{materialKindLabel(source.kind)}</span>
+                        <span className="text-[11px] font-medium">
+                          {materialKindLabel(source.kind)}
+                        </span>
                       </div>
                       <div className="mt-2 text-sm font-medium leading-5">{source.title}</div>
-                      <p className="mt-1 line-clamp-3 text-xs leading-5 text-muted-foreground">{source.excerpt}</p>
+                      <p className="mt-1 line-clamp-3 text-xs leading-5 text-muted-foreground">
+                        {source.excerpt}
+                      </p>
                     </article>
                   ))}
                 </div>
@@ -444,10 +484,20 @@ function KnowledgePage() {
   );
 }
 
-function StatCard({ value, label, icon }: { value: number; label: string; icon: React.ReactNode }) {
+function StatCard({
+  value,
+  label,
+  icon,
+}: {
+  value: number;
+  label: string;
+  icon: React.ReactNode;
+}) {
   return (
     <div className="flex items-center gap-3 rounded-2xl border border-border/65 bg-card px-4 py-3.5">
-      <div className="flex size-9 items-center justify-center rounded-xl bg-blue-50 text-blue-700">{icon}</div>
+      <div className="flex size-9 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+        {icon}
+      </div>
       <div>
         <div className="text-xl font-semibold tabular-nums">{value}</div>
         <div className="text-xs text-muted-foreground">{label}</div>

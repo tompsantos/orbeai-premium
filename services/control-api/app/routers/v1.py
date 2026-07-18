@@ -9,6 +9,7 @@ from app.routers import (
     chat_send,
     chats,
     feature_flags,
+    knowledge,
     memories,
     messages,
     model_providers,
@@ -28,6 +29,7 @@ router.include_router(projects.router, dependencies=protected_dependencies)
 router.include_router(workspace.router, dependencies=protected_dependencies)
 router.include_router(artifacts.router, dependencies=protected_dependencies)
 router.include_router(memories.router, dependencies=protected_dependencies)
+router.include_router(knowledge.router, dependencies=protected_dependencies)
 router.include_router(chats.router, dependencies=protected_dependencies)
 router.include_router(messages.router, dependencies=protected_dependencies)
 router.include_router(chat_send.router, dependencies=protected_dependencies)
