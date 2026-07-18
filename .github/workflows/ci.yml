@@ -82,9 +82,33 @@ jobs:
       - name: migrate test database
         run: alembic upgrade head
       - name: lint
-        run: ruff check app tests --output-format=concise
+        id: control_lint
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          ruff check app tests --output-format=concise 2>&1 | tee /tmp/control-api-ruff.log
       - name: tests
-        run: pytest -q
+        id: control_tests
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          pytest -q 2>&1 | tee /tmp/control-api-pytest.log
+      - name: upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: control-api-diagnostics
+          path: |
+            /tmp/control-api-ruff.log
+            /tmp/control-api-pytest.log
+          retention-days: 7
+          if-no-files-found: warn
+      - name: enforce quality gate
+        if: steps.control_lint.outcome == 'failure' || steps.control_tests.outcome == 'failure'
+        run: |
+          echo "lint=${{ steps.control_lint.outcome }}"
+          echo "tests=${{ steps.control_tests.outcome }}"
+          exit 1
 
   web:
     name: web
