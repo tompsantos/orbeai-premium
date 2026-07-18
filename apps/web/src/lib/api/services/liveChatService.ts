@@ -169,9 +169,9 @@ function normalizeResult(payload: BackendChatSendResponse): LiveChatResult {
     fallbackChain: toFallbackChain(routerDecision?.fallback_chain, provider),
     routingMode: "automático",
     estimatedLatencyMs:
-      typeof estimatedLatencyMs === "number" ? estimatedLatencyMs : undefined,
+      typeof estimatedLatencyMs === "number" ? estimatedLatencyMs : latencyMs,
     estimatedCostUsd:
-      typeof estimatedCostUsd === "number" ? estimatedCostUsd : undefined,
+      typeof estimatedCostUsd === "number" ? estimatedCostUsd : 0,
     qualityTier: payload.provider === "orbe-mock" ? "padrão" : "premium",
     taskHints: toTaskHints(routerDecision?.task_hints),
     debugInfo: {
@@ -182,6 +182,8 @@ function normalizeResult(payload: BackendChatSendResponse): LiveChatResult {
       source: "backend-live",
       routerDecision,
       providerAttempts: assistantMeta.provider_attempts,
+      estimatedCostAvailable: typeof estimatedCostUsd === "number",
+      estimatedLatencyAvailable: typeof estimatedLatencyMs === "number",
     },
   };
 
