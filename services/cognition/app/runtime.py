@@ -74,6 +74,7 @@ def _make_agent(
         ephemeral_system_prompt=build_identity(
             mode=request.mode,
             memory_context=request.memory_context,
+            knowledge_context=request.knowledge_context,
         ),
         platform="api_server",
         user_id=request.user_id,
