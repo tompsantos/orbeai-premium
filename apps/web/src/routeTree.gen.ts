@@ -12,9 +12,9 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as AppIndexRouteImport } from './routes/app.index'
 import { Route as AppSettingsRouteImport } from './routes/app.settings'
 import { Route as AppResearchRouteImport } from './routes/app.research'
+import { Route as AppProviderCredentialsRouteImport } from './routes/app.provider-credentials'
 import { Route as AppProjectsRouteImport } from './routes/app.projects'
 import { Route as AppOrbeoneRouteImport } from './routes/app.orbeone'
 import { Route as AppModelsRouteImport } from './routes/app.models'
@@ -55,6 +55,11 @@ const AppSettingsRoute = AppSettingsRouteImport.update({
 const AppResearchRoute = AppResearchRouteImport.update({
   id: '/research',
   path: '/research',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppProviderCredentialsRoute = AppProviderCredentialsRouteImport.update({
+  id: '/provider-credentials',
+  path: '/provider-credentials',
   getParentRoute: () => AppRoute,
 } as any)
 const AppProjectsRoute = AppProjectsRouteImport.update({
@@ -126,6 +131,7 @@ export interface FileRoutesByFullPath {
   '/app/models': typeof AppModelsRoute
   '/app/orbeone': typeof AppOrbeoneRoute
   '/app/projects': typeof AppProjectsRouteWithChildren
+  '/app/provider-credentials': typeof AppProviderCredentialsRoute
   '/app/research': typeof AppResearchRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/': typeof AppIndexRoute
@@ -143,6 +149,7 @@ export interface FileRoutesByTo {
   '/app/memory': typeof AppMemoryRoute
   '/app/models': typeof AppModelsRoute
   '/app/orbeone': typeof AppOrbeoneRoute
+  '/app/provider-credentials': typeof AppProviderCredentialsRoute
   '/app/research': typeof AppResearchRoute
   '/app/settings': typeof AppSettingsRoute
   '/app': typeof AppIndexRoute
@@ -163,6 +170,7 @@ export interface FileRoutesById {
   '/app/models': typeof AppModelsRoute
   '/app/orbeone': typeof AppOrbeoneRoute
   '/app/projects': typeof AppProjectsRouteWithChildren
+  '/app/provider-credentials': typeof AppProviderCredentialsRoute
   '/app/research': typeof AppResearchRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/': typeof AppIndexRoute
@@ -184,6 +192,7 @@ export interface FileRouteTypes {
     | '/app/models'
     | '/app/orbeone'
     | '/app/projects'
+    | '/app/provider-credentials'
     | '/app/research'
     | '/app/settings'
     | '/app/'
@@ -201,6 +210,7 @@ export interface FileRouteTypes {
     | '/app/memory'
     | '/app/models'
     | '/app/orbeone'
+    | '/app/provider-credentials'
     | '/app/research'
     | '/app/settings'
     | '/app'
@@ -220,6 +230,7 @@ export interface FileRouteTypes {
     | '/app/models'
     | '/app/orbeone'
     | '/app/projects'
+    | '/app/provider-credentials'
     | '/app/research'
     | '/app/settings'
     | '/app/'
@@ -275,6 +286,13 @@ declare module '@tanstack/react-router' {
       path: '/research'
       fullPath: '/app/research'
       preLoaderRoute: typeof AppResearchRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/provider-credentials': {
+      id: '/app/provider-credentials'
+      path: '/provider-credentials'
+      fullPath: '/app/provider-credentials'
+      preLoaderRoute: typeof AppProviderCredentialsRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/projects': {
@@ -381,6 +399,7 @@ interface AppRouteChildren {
   AppModelsRoute: typeof AppModelsRoute
   AppOrbeoneRoute: typeof AppOrbeoneRoute
   AppProjectsRoute: typeof AppProjectsRouteWithChildren
+  AppProviderCredentialsRoute: typeof AppProviderCredentialsRoute
   AppResearchRoute: typeof AppResearchRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppIndexRoute: typeof AppIndexRoute
@@ -396,6 +415,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppModelsRoute: AppModelsRoute,
   AppOrbeoneRoute: AppOrbeoneRoute,
   AppProjectsRoute: AppProjectsRouteWithChildren,
+  AppProviderCredentialsRoute: AppProviderCredentialsRoute,
   AppResearchRoute: AppResearchRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppIndexRoute: AppIndexRoute,
