@@ -26,6 +26,7 @@ def test_runtime_state_starts_with_safe_defaults() -> None:
     assert flags["real_providers"] is True
     assert flags["auto_memory"] is True
     assert flags["memory_context"] is True
+    assert flags["knowledge_context"] is True
     assert flags["audit_logs"] is True
     assert flags["artifact_versions"] is True
 
