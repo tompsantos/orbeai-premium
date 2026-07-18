@@ -91,7 +91,7 @@ def test_live_fallback_uses_and_persists_selected_knowledge(monkeypatch) -> None
         "POST",
         "/v1/chat/live",
         json={
-            "content": f"Explique o protocolo {token}.",
+            "content": token,
             "mode": "research",
             "model_preference": "auto",
         },
