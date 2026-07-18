@@ -24,7 +24,6 @@ from app.services.providers.real import execute_provider
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-
 router = APIRouter(prefix="/provider-credentials", tags=["provider-credentials"])
 
 
