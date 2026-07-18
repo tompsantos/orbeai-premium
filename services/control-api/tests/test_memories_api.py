@@ -13,7 +13,9 @@ def test_memory_crud_and_filters() -> None:
             "content": "Responder de forma direta e prática.",
             "scope": "global",
             "status": "pendente",
-            "source_type": "manual",
+            "source_type": "chat",
+            "source_product": "orbeAI",
+            "source_entity_id": "message_test_123",
         },
     )
 
@@ -22,6 +24,9 @@ def test_memory_crud_and_filters() -> None:
 
     assert memory["label"] == "Preferência de resposta"
     assert memory["status"] == "pendente"
+    assert memory["source_type"] == "chat"
+    assert memory["source_product"] == "orbeAI"
+    assert memory["source_entity_id"] == "message_test_123"
 
     list_response = client.get("/v1/memories?status=pendente&q=prática")
     assert list_response.status_code == 200
@@ -39,6 +44,7 @@ def test_memory_crud_and_filters() -> None:
     updated = update_response.json()
     assert updated["status"] == "ativa"
     assert updated["confidence"] == 0.95
+    assert updated["source_entity_id"] == "message_test_123"
 
     delete_response = client.delete(f"/v1/memories/{memory['id']}")
     assert delete_response.status_code == 204
