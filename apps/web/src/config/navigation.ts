@@ -5,6 +5,7 @@ import {
   FlaskConical,
   FolderKanban,
   Gauge,
+  KeyRound,
   Library,
   MessageSquare,
   Settings,
@@ -45,6 +46,7 @@ export const LAB_NAV: NavigationItem[] = [
 
 export const ADMIN_NAV: NavigationItem[] = [
   { id: "administration", label: "Administração", to: "/app/admin", icon: ShieldCheck },
+  { id: "provider-credentials", label: "Credenciais de IA", to: "/app/provider-credentials", icon: KeyRound },
   { id: "settings", label: "Configurações", to: "/app/settings", icon: Settings, mobile: true },
 ];
 
