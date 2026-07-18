@@ -146,14 +146,18 @@ def test_provider_credential(
         error_code = type(exc).__name__
         message = "a credencial foi encontrada, mas o provider recusou o teste"
 
-    summary = record_provider_test(
-        db,
-        workspace_id=context.workspace_id,
-        provider_slug=provider_slug,
-        success=success,
-        latency_ms=latency_ms,
-        error_code=error_code,
-    )
+    if credential.source == "workspace_vault":
+        summary = record_provider_test(
+            db,
+            workspace_id=context.workspace_id,
+            provider_slug=provider_slug,
+            success=success,
+            latency_ms=latency_ms,
+            error_code=error_code,
+        )
+    else:
+        summary = provider_credential_summary(db, context.workspace_id, provider_slug)
+
     write_audit_log(
         db=db,
         workspace_id=context.workspace_id,
@@ -162,6 +166,7 @@ def test_provider_credential(
         resource_id=provider_slug,
         meta={
             "provider": provider_slug,
+            "credential_source": credential.source,
             "success": success,
             "latency_ms": latency_ms,
             "model_name": model_name,
