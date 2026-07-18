@@ -84,6 +84,12 @@ function buildFallback(primary: ProviderSlug): ProviderSlug[] {
   return order.filter((provider) => provider !== primary);
 }
 
+function clientProvider(provider: ProviderSlug) {
+  return provider in providersBySlug
+    ? providersBySlug[provider as keyof typeof providersBySlug]
+    : providersBySlug.mock;
+}
+
 export function resolveRoute(opts: {
   mode?: ChatMode;
   model?: ModelKey;
@@ -130,7 +136,7 @@ export function resolveRoute(opts: {
 
   return {
     provider,
-    model: providersBySlug[provider].slug,
+    model: clientProvider(provider).slug,
     reason,
     fallbackChain: buildFallback(provider),
     routingMode: effectiveRouting,
@@ -151,8 +157,8 @@ export async function runWithFallback(decision: RouterDecision, req: AIRequest):
   });
   let lastError: unknown;
   for (const slug of order) {
-    const provider = providersBySlug[slug as keyof typeof providersBySlug];
-    if (!provider?.isConfigured()) {
+    const provider = clientProvider(slug);
+    if (!provider.isConfigured()) {
       lastError = new Error(`${slug} não configurado`);
       continue;
     }
