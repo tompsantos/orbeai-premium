@@ -3,7 +3,6 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-
 KnowledgeKind = Literal["web", "arquivo", "interna", "integração"]
 ResearchStatus = Literal["rascunho", "em andamento", "concluído"]
 

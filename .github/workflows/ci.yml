@@ -1,35 +1,52 @@
 name: ci
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
-      - agent/**
   pull_request:
+
+concurrency:
+  group: orbeai-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
+env:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  PYTHONDONTWRITEBYTECODE: "1"
+
 jobs:
   cognition:
-    runs-on: ubuntu-24.04
+    name: cognition
+    runs-on: [self-hosted, linux, x64, orbeai-lab]
+    timeout-minutes: 25
     defaults:
       run:
+        shell: bash
         working-directory: services/cognition
     steps:
       - uses: actions/checkout@v4
+        with:
+          clean: true
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: services/cognition/pyproject.toml
       - name: install
-        run: pip install -q -e ".[dev]"
+        run: python -m pip install -q -e ".[dev]"
       - name: lint
         run: ruff check app tests --output-format=concise
       - name: tests
         run: pytest -q
 
   control-api:
-    runs-on: ubuntu-24.04
+    name: control-api
+    runs-on: [self-hosted, linux, x64, orbeai-lab]
+    timeout-minutes: 25
     services:
       postgres:
         image: postgres:16-alpine
@@ -49,31 +66,67 @@ jobs:
       COGNITION_ENABLED: "false"
     defaults:
       run:
+        shell: bash
         working-directory: services/control-api
     steps:
       - uses: actions/checkout@v4
+        with:
+          clean: true
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: services/control-api/pyproject.toml
       - name: install
-        run: pip install -q -e ".[dev]"
+        run: python -m pip install -q -e ".[dev]"
       - name: migrate test database
         run: alembic upgrade head
       - name: lint
-        run: ruff check app tests --output-format=concise
+        id: control_lint
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          ruff check app tests --output-format=concise 2>&1 | tee /tmp/control-api-ruff.log
       - name: tests
-        run: pytest -q
+        id: control_tests
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          pytest -q 2>&1 | tee /tmp/control-api-pytest.log
+      - name: upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: control-api-diagnostics
+          path: |
+            /tmp/control-api-ruff.log
+            /tmp/control-api-pytest.log
+          retention-days: 7
+          if-no-files-found: warn
+      - name: enforce quality gate
+        if: steps.control_lint.outcome == 'failure' || steps.control_tests.outcome == 'failure'
+        run: |
+          echo "lint=${{ steps.control_lint.outcome }}"
+          echo "tests=${{ steps.control_tests.outcome }}"
+          exit 1
 
   web:
-    runs-on: ubuntu-24.04
+    name: web
+    runs-on: [self-hosted, linux, x64, orbeai-lab]
+    timeout-minutes: 25
     defaults:
       run:
+        shell: bash
         working-directory: apps/web
     steps:
       - uses: actions/checkout@v4
+        with:
+          clean: true
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/web/package.json
       - name: install
         run: npm install --silent
       - name: typecheck
