@@ -35,6 +35,7 @@ def execute_chat_runtime(
     mode: str,
     model_preference: str,
     memory_context: str | None,
+    knowledge_context: str | None,
     conversation_history: list[dict[str, Any]],
 ) -> ChatRuntimeExecution:
     settings = get_settings()
@@ -49,6 +50,7 @@ def execute_chat_runtime(
                 content=content,
                 mode=mode,
                 memory_context=memory_context,
+                knowledge_context=knowledge_context,
                 conversation_history=conversation_history,
             )
             return ChatRuntimeExecution(
@@ -78,6 +80,7 @@ def execute_chat_runtime(
             mode=mode,
             model_preference=model_preference,
             memory_context=memory_context,
+            knowledge_context=knowledge_context,
         )
         router_reason = decision.reason
 
@@ -93,6 +96,7 @@ def execute_chat_runtime(
             mode=mode,
             model_preference=model_preference,
             memory_context=memory_context,
+            knowledge_context=knowledge_context,
         )
         router_reason = (
             f"{decision.reason} A execução legada falhou e o orbe-mock foi acionado. "
