@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends
+from typing import Any
+
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -15,6 +17,32 @@ from app.services.workspace_settings import get_or_create_workspace_settings
 
 router = APIRouter(prefix="/workspace", tags=["workspace"])
 
+_RESERVED_META_KEYS = {"provider_credentials"}
+
+
+def _public_meta(meta: dict[str, Any] | None) -> dict[str, Any] | None:
+    if meta is None:
+        return None
+    return {key: value for key, value in meta.items() if key not in _RESERVED_META_KEYS}
+
+
+def to_workspace_settings_read(settings: object) -> WorkspaceSettingsRead:
+    return WorkspaceSettingsRead(
+        id=settings.id,
+        workspace_id=settings.workspace_id,
+        locale=settings.locale,
+        timezone=settings.timezone,
+        default_chat_mode=settings.default_chat_mode,
+        default_model_preference=settings.default_model_preference,
+        memory_policy=settings.memory_policy,
+        data_retention_days=settings.data_retention_days,
+        allow_exports=settings.allow_exports,
+        allow_public_sharing=settings.allow_public_sharing,
+        meta=_public_meta(settings.meta),
+        created_at=settings.created_at,
+        updated_at=settings.updated_at,
+    )
+
 
 def to_workspace_read(workspace: Workspace, settings: object) -> WorkspaceRead:
     return WorkspaceRead(
@@ -24,7 +52,7 @@ def to_workspace_read(workspace: Workspace, settings: object) -> WorkspaceRead:
         plan=workspace.plan,
         created_at=workspace.created_at,
         updated_at=workspace.updated_at,
-        settings=WorkspaceSettingsRead.model_validate(settings),
+        settings=to_workspace_settings_read(settings),
     )
 
 
@@ -35,7 +63,6 @@ def get_workspace(
 ) -> WorkspaceRead:
     workspace = context.workspace
     settings = get_or_create_workspace_settings(db, workspace)
-
     return to_workspace_read(workspace, settings)
 
 
@@ -70,7 +97,6 @@ def update_workspace(
     db.add(workspace)
     db.commit()
     db.refresh(workspace)
-
     return to_workspace_read(workspace, settings)
 
 
@@ -84,7 +110,22 @@ def update_workspace_settings(
     settings = get_or_create_workspace_settings(db, workspace)
     changes = payload.model_dump(exclude_unset=True)
 
+    requested_meta = changes.get("meta")
+    if isinstance(requested_meta, dict) and _RESERVED_META_KEYS.intersection(requested_meta):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Reserved workspace metadata cannot be changed through this endpoint",
+        )
+
     for field, value in changes.items():
+        if field == "meta":
+            protected = {
+                key: value
+                for key, value in dict(settings.meta or {}).items()
+                if key in _RESERVED_META_KEYS
+            }
+            settings.meta = {**dict(value or {}), **protected}
+            continue
         setattr(settings, field, value)
 
     write_audit_log(
@@ -108,5 +149,4 @@ def update_workspace_settings(
     db.add(settings)
     db.commit()
     db.refresh(settings)
-
-    return WorkspaceSettingsRead.model_validate(settings)
+    return to_workspace_settings_read(settings)
