@@ -13,7 +13,9 @@ FROM node:22-alpine AS runtime
 
 ENV NODE_ENV=production \
     HOST=0.0.0.0 \
-    PORT=80
+    PORT=80 \
+    NITRO_HOST=0.0.0.0 \
+    NITRO_PORT=80
 
 WORKDIR /app
 COPY --from=build /app/.output ./.output
