@@ -42,7 +42,7 @@ def test_router_v1_selects_direct_provider_for_simple_turn(monkeypatch) -> None:
     assert decision.model_name == "openai-test-model"
     assert decision.estimated_latency_ms is None
     assert decision.estimated_cost_usd is None
-    assert decision.execution_plan.provider_chain == ("openai", "gemini", "mock")
+    assert decision.execution_plan.provider_chain == ("openai", "gemini", "nvidia", "mock")
 
 
 def test_router_v1_sends_tool_request_to_cognition(monkeypatch) -> None:
