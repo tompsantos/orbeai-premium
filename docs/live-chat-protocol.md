@@ -40,6 +40,8 @@ browser -> control-api -> orbe-cognition -> Hermes AIAgent
 4. Raciocínio interno não é transmitido. Apenas estados seguros de apresentação.
 5. Mensagem do usuário e auto-memory são persistidos antes do stream.
 6. Pesquisas e materiais são selecionados por workspace, projeto e relevância textual.
-7. Toda seleção de conhecimento gera auditoria com ids, tipo, score e indicação de referência sem conteúdo armazenado.
-8. Resposta, model run e auditoria são persistidos no estado terminal do turno.
-9. `always` não é uma opção pública. Mudanças permanentes de política exigem governança própria.
+7. Toda seleção de conhecimento gera uma única auditoria com ids, tipo, score e indicação de referência sem conteúdo armazenado.
+8. O mesmo contexto selecionado é entregue ao cognition e ao provider de contingência, sem nova seleção durante o stream.
+9. Metadados públicos das fontes usadas são persistidos na mensagem do assistente e na auditoria `chat.live`.
+10. Resposta, model run e auditoria são persistidos no estado terminal do turno.
+11. `always` não é uma opção pública. Mudanças permanentes de política exigem governança própria.
