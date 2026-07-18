@@ -2,7 +2,7 @@
 
 A distribuição cognitiva premium da orbeOne.
 
-Este repositório une o produto funcional de `tompsantos/orbeai` ao runtime agêntico do `NousResearch/hermes-agent`, preservando experiência, autenticação, governança e arquitetura multiusuário da orbeAI enquanto o Hermes fornece o núcleo de execução, ferramentas, contexto, sessões, skills e evolução procedural.
+Este repositório une o produto funcional de `tompsantos/orbeai` ao runtime agêntico do `NousResearch/hermes-agent`, preservando experiência, autenticação, governança e arquitetura multiusuário da orbeAI enquanto o Hermes fornece o núcleo de execução cognitiva quando o orbeRouter decide que ele é necessário.
 
 ## visão do produto
 
@@ -27,11 +27,13 @@ internet
 orbeAI web
    ↓
 orbeAI control API
-   ↓ rede interna
-orbe cognition core
    ↓
-modelos · memória · skills · ferramentas · subagentes
+orbeRouter
+   ├── provider gateway → OpenAI, Gemini ou mock declarado
+   └── orbe cognition core → Hermes AIAgent
 ```
+
+A orbeAI é o produto. O Hermes vive dentro de `services/cognition` e não controla autenticação, tenants, persistência, auditoria, orçamento ou políticas.
 
 ## infraestrutura-alvo
 
@@ -45,32 +47,29 @@ modelos · memória · skills · ferramentas · subagentes
 
 ```text
 apps/web                  interface premium da orbeAI
-services/control-api      auth, espaços, políticas, auditoria e persistência
+services/control-api      auth, espaços, políticas, router, auditoria e persistência
 services/cognition        runtime cognitivo derivado do Hermes
 packages/contracts        contratos compartilhados
 infra                     compose, nginx e implantação
-docs                      arquitetura e decisões
+docs                      arquitetura, roadmap e decisões
 ```
 
 ## estado atual
 
-### fundação técnica
+### era 0 — fundação
 
-A fundação atual entrega:
+Concluída:
 
 - monorepo e contratos arquiteturais;
 - serviço `orbe-cognition` integrado ao projeto;
 - import direto e fixado do `AIAgent`;
 - isolamento por `workspace_id`, `user_id` e `chat_id`;
-- identidade nativa da orbeAI;
+- autenticação, PostgreSQL, auditoria e feature flags;
 - chave interna entre serviços;
-- restrição inicial de ferramentas;
-- healthcheck, capabilities e testes;
-- control API operando em modo cognition-first;
-- fallback legado temporário para migração segura e observável;
+- CI com jobs `control-api`, `cognition` e `web` na `orbeone-lab-01`;
 - preparação para a infraestrutura Locaweb.
 
-### fundação da experiência
+### era 1 — identidade e primeira volta
 
 A primeira grande volta da interface foi concluída e integrada ao `main` pelos PRs #5 a #15, exceto Projetos, que foi mantido provisoriamente para uma revisão funcional posterior.
 
@@ -88,21 +87,33 @@ A primeira grande volta da interface foi concluída e integrada ao `main` pelos 
 | Administração | `/app/admin` | visão geral, proteção, atividade, consumo e saúde do sistema |
 | Configurações | `/app/settings` | conta, experiência, privacidade, conexões e avisos |
 
-Algumas rotas ainda conservam nomes internos herdados, como `research`, `artifacts`, `agents` e `orbeone`. Os nomes exibidos ao usuário já refletem a arquitetura nova. A renomeação técnica poderá acontecer depois, com migração controlada para não quebrar links e o route tree.
+Algumas rotas ainda conservam nomes internos herdados. Essa dívida não bloqueia a era 2.
+
+### era 2 — orbeRouter v1
+
+Em construção:
+
+- kernel com `RouterRequest`, classificação, `RouterDecision` e `ExecutionPlan`;
+- registry de capacidades implementadas e futuras;
+- provider registry com estados reais de configuração;
+- gateway direto com retry, tentativas e fallback explícito;
+- decisão persistida antes da execução;
+- separação entre provider direto e cognition;
+- evento SSE `router.decision`;
+- model run, latência, provider, modelo e tentativas persistidos;
+- mock identificado como mock.
+
+O primeiro marco só fecha quando uma mensagem enviada pela interface receber uma resposta de provider real e a execução puder ser provada tecnicamente.
 
 ## limites conscientes da prévia
 
-A interface já representa a direção oficial do produto, mas ainda mistura fluxos reais com demonstrações de frontend.
-
-- alguns botões usam mocks, estado local e mensagens de confirmação;
-- nem toda criação, alteração ou preferência já possui persistência no banco;
+- alguns botões ainda usam mocks, estado local e mensagens de confirmação;
 - Equipes e Espaços apresentam o modelo de uso, mas ainda precisam de integração funcional completa;
 - a voz é apenas a casca visual, sem captura de microfone ou transporte de áudio;
-- o seletor de modelo foi removido da experiência comum e o roteamento permanece automático;
 - detalhes técnicos continuam acessíveis no Laboratório;
 - o modo mock permite navegar pela prévia sem autenticação real quando `VITE_MOCK_MODE` não está definido como `false`.
 
-Nenhuma ação simulada deve ser tratada como persistência concluída até que o respectivo serviço esteja conectado e validado.
+Nenhuma ação simulada deve ser tratada como persistência concluída. Uma resposta mock também não vale como evidência do marco real do orbeRouter.
 
 ## prévia no GitHub Codespaces
 
@@ -115,42 +126,26 @@ bash .devcontainer/start-preview.sh
 
 O script inicia o frontend em modo de prévia e valida uma rota protegida. Depois de trocar de branch, encerre processos antigos do Vite antes de reiniciar para evitar código obsoleto na porta.
 
-Se a URL externa devolver `401`, a porta do Codespaces provavelmente está privada. Para uma inspeção temporária:
-
-```bash
-gh codespace ports visibility 8080:public -c "$CODESPACE_NAME"
-```
-
-Depois da inspeção, a porta pode voltar ao modo privado:
-
-```bash
-gh codespace ports visibility 8080:private -c "$CODESPACE_NAME"
-```
-
 ## validação
 
-As mudanças da fundação visual passam pelo workflow de CI com três blocos:
+O workflow de CI possui três blocos:
 
 - `web`: instalação, typecheck e build;
-- `control-api`: migração de banco de teste, lint e testes;
+- `control-api`: PostgreSQL descartável, migration, lint e testes;
 - `cognition`: lint e testes.
 
-A primeira volta da interface foi encerrada com os três blocos aprovados.
+Merge só pode ocorrer quando os jobs do head atual estiverem verdes de verdade.
 
-## próxima fase
+## próximo marco
 
-A próxima etapa deixa de ser apenas uma reforma visual e passa a conectar o sistema por dentro:
+1. validar a arquitetura do router v1 na CI;
+2. confirmar qual adapter real possui credencial disponível na bancada sem expor o segredo;
+3. enviar uma mensagem pelo frontend conectado;
+4. comprovar `router.decision`, provider registry, gateway ou cognition, model run, streaming e resposta persistida;
+5. registrar provider, modelo, motivo, fallback, latência e ids sanitizados;
+6. só então avançar para semântica, políticas e integração cognitiva mais profunda.
 
-1. mapear cada ação simulada e classificar como real, parcial ou apenas demonstrativa;
-2. conectar Chat, Memória, Conhecimento e Biblioteca em fluxos contínuos;
-3. implementar persistência real de Equipes, Espaços, preferências e permissões;
-4. revisar profundamente Projetos, Administração, Equipes e Espaços;
-5. integrar autenticação real sem prejudicar o modo seguro de prévia;
-6. concluir transporte de voz quando a arquitetura de áudio estiver definida;
-7. revisar responsividade, acessibilidade, estados vazios, carregamento e erros;
-8. planejar a migração das rotas internas herdadas;
-9. preparar uma matriz de recursos por tela, serviço, endpoint e tabela de banco;
-10. validar a jornada completa de um usuário pessoal e de um usuário profissional.
+Conhecimento visual, citações refinadas, responsividade fina e renomeação de rotas permanecem congelados enquanto não forem necessários para esse marco.
 
 ## upstreams
 
@@ -159,12 +154,3 @@ A próxima etapa deixa de ser apenas uma reforma visual e passa a conectar o sis
 - commit inicial fixado do Hermes: `36bf3c2673e39a7b237b04c5a637ff29e1278e66`.
 
 O Hermes Agent é licenciado sob MIT. Os avisos legais e de copyright serão preservados nas distribuições derivadas.
-
-## produto transplantado
-
-A interface e o backend funcional da orbeAI original vivem em:
-
-- `apps/web`;
-- `services/control-api`.
-
-O endpoint de chat do control API opera em modo cognition-first e chama `services/cognition`, mantendo fallback legado temporário para uma migração segura e observável.
