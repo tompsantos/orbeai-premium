@@ -127,19 +127,19 @@ def run_openai_provider(
         knowledge_context=knowledge_context,
     )
 
-    client = OpenAI(api_key=settings.openai_api_key)
-
+    client = OpenAI(
+        api_key=settings.openai_api_key,
+        timeout=settings.provider_timeout_seconds,
+    )
     response = client.responses.create(
         model=settings.openai_model,
         input=prompt,
     )
 
     output_text = getattr(response, "output_text", None) or str(response)
-
     usage = getattr(response, "usage", None)
     input_tokens = getattr(usage, "input_tokens", None) if usage else None
     output_tokens = getattr(usage, "output_tokens", None) if usage else None
-
     final_input_tokens = input_tokens or estimate_tokens(prompt)
     final_output_tokens = output_tokens or estimate_tokens(output_text)
 
@@ -181,15 +181,16 @@ def run_gemini_provider(
         knowledge_context=knowledge_context,
     )
 
-    client = genai.Client(api_key=settings.gemini_api_key)
-
+    client = genai.Client(
+        api_key=settings.gemini_api_key,
+        http_options={"timeout": int(settings.provider_timeout_seconds * 1_000)},
+    )
     interaction = client.interactions.create(
         model=settings.gemini_model,
         input=prompt,
     )
 
     output_text = getattr(interaction, "output_text", None) or str(interaction)
-
     input_tokens = estimate_tokens(prompt)
     output_tokens = estimate_tokens(output_text)
 
@@ -234,10 +235,13 @@ def execute_provider(
             knowledge_context=knowledge_context,
         )
 
-    return run_mock_provider(
-        content=content,
-        mode=mode,
-        model_preference=model_preference,
-        memory_context=memory_context,
-        knowledge_context=knowledge_context,
-    )
+    if provider_slug == "mock":
+        return run_mock_provider(
+            content=content,
+            mode=mode,
+            model_preference=model_preference,
+            memory_context=memory_context,
+            knowledge_context=knowledge_context,
+        )
+
+    raise ValueError(f"provider sem adapter direto registrado: {provider_slug}")
