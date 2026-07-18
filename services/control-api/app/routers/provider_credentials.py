@@ -1,15 +1,9 @@
 from time import perf_counter
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
-
 from app.db.session import get_db
-from app.dependencies.workspace import CurrentWorkspaceContext, get_current_workspace_context
-from app.schemas.provider_credentials import (
-    ProviderCredentialRead,
-    ProviderCredentialSlug,
-    ProviderCredentialTestRead,
-    ProviderCredentialUpsert,
+from app.dependencies.workspace import (
+    CurrentWorkspaceContext,
+    get_current_workspace_context,
 )
 from app.services.audit import write_audit_log
 from app.services.provider_credentials import (
@@ -21,6 +15,15 @@ from app.services.provider_credentials import (
     upsert_provider_credential,
 )
 from app.services.providers.real import execute_provider
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+
+from app.schemas.provider_credentials import (
+    ProviderCredentialRead,
+    ProviderCredentialSlug,
+    ProviderCredentialTestRead,
+    ProviderCredentialUpsert,
+)
 
 
 router = APIRouter(prefix="/provider-credentials", tags=["provider-credentials"])
