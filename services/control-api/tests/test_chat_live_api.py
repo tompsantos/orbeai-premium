@@ -18,7 +18,7 @@ def _events(body: str) -> list[dict]:
     return events
 
 
-def test_live_chat_streams_and_persists_fallback_response(monkeypatch) -> None:
+def test_live_chat_streams_and_persists_router_execution(monkeypatch) -> None:
     monkeypatch.setattr(
         chat_live_module,
         "get_settings",
@@ -45,19 +45,41 @@ def test_live_chat_streams_and_persists_fallback_response(monkeypatch) -> None:
     events = _events(body)
     event_types = [event["type"] for event in events]
     assert event_types[0] == "run.started"
-    assert "fallback.started" in event_types
+    assert "router.decision" in event_types
+    assert "execution.started" in event_types
     assert "response.delta" in event_types
     assert event_types[-1] == "response.completed"
+
+    router_event = next(event for event in events if event["type"] == "router.decision")
+    assert router_event["decision"]["router_version"] == "orbe-router-v1"
+    assert router_event["decision"]["execution_strategy"] == "direct_provider"
 
     completed = events[-1]["response"]
     assert completed["provider"] == "orbe-mock"
     assert completed["assistant_message"]["content"]
+
+    user_meta = completed["user_message"]["meta"]
+    assistant_meta = completed["assistant_message"]["meta"]
+    assert user_meta["router_decision"]["router_version"] == "orbe-router-v1"
+    assert assistant_meta["router_decision"]["execution_strategy"] == "direct_provider"
+    assert assistant_meta["provider_attempts"][-1]["status"] == "success"
+    assert assistant_meta["latency_ms"] >= 0
 
     messages = client.get(f"/v1/chats/{completed['chat_id']}/messages")
     assert messages.status_code == 200
     message_ids = {message["id"] for message in messages.json()}
     assert completed["user_message"]["id"] in message_ids
     assert completed["assistant_message"]["id"] in message_ids
+
+    model_run = client.get(f"/v1/model-runs/{completed['model_run_id']}")
+    assert model_run.status_code == 200
+    assert model_run.json()["task_type"] == "chat.live.direct_provider"
+
+    router_logs = client.get("/v1/audit-logs?action=router.decision&limit=300").json()
+    persisted = next(
+        log for log in router_logs if log["request_id"] == router_event["request_id"]
+    )
+    assert persisted["meta"]["decision"]["router_version"] == "orbe-router-v1"
 
 
 def test_live_registry_rejects_foreign_owner() -> None:
