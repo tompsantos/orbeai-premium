@@ -18,6 +18,7 @@ from app.models.core import (
     WorkspaceMember,
     WorkspaceSettings,
 )
+from app.models.knowledge import KnowledgeMaterial, ResearchReport
 
 __all__ = [
     "Artifact",
@@ -27,11 +28,13 @@ __all__ = [
     "Chat",
     "FeatureFlag",
     "IntegrationClient",
+    "KnowledgeMaterial",
     "Memory",
     "Message",
     "ModelProvider",
     "ModelRun",
     "Project",
+    "ResearchReport",
     "User",
     "Workspace",
     "WorkspaceMember",
