@@ -22,3 +22,5 @@ def test_capabilities_in_development_without_key() -> None:
     assert payload["streaming"] is True
     assert payload["stop"] is True
     assert payload["approvals"] is True
+    assert payload["external_memory_context"] is True
+    assert payload["external_knowledge_context"] is True
