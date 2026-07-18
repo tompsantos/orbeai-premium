@@ -27,6 +27,16 @@ interface BackendArtifact {
   versions: BackendArtifactVersion[];
 }
 
+interface ArtifactCreateInput {
+  title: string;
+  kind: ArtifactKind;
+  content?: string;
+  projectId?: string;
+  sourceType?: string;
+  sourceProduct?: string;
+  sourceEntityId?: string;
+}
+
 function all(): Artifact[] {
   localStore.ensureSeeded();
   return localStore.get<Artifact[]>(STORAGE_KEYS.artifacts, mockArtifacts);
@@ -83,6 +93,9 @@ function toArtifact(dto: BackendArtifact): Artifact {
     versions: dto.versions
       .sort((a, b) => a.version_number - b.version_number)
       .map(toArtifactVersion),
+    sourceType: dto.source_type ?? undefined,
+    sourceProduct: dto.source_product ?? undefined,
+    sourceEntityId: dto.source_entity_id ?? undefined,
   };
 }
 
@@ -109,7 +122,7 @@ export const artifactService = {
     return all().find((a) => a.id === id) ?? null;
   },
 
-  async create(input: { title: string; kind: ArtifactKind; content?: string; projectId?: string }): Promise<Artifact> {
+  async create(input: ArtifactCreateInput): Promise<Artifact> {
     if (!apiClient.isMock) {
       const artifact = await apiClient.request<BackendArtifact>("/v1/artifacts", {
         method: "POST",
@@ -118,8 +131,9 @@ export const artifactService = {
           kind: input.kind,
           content: input.content ?? "",
           project_id: input.projectId,
-          source_type: "frontend",
-          source_product: "orbeAI",
+          source_type: input.sourceType ?? "frontend",
+          source_product: input.sourceProduct ?? "orbeAI",
+          source_entity_id: input.sourceEntityId,
         }),
       });
 
@@ -135,6 +149,9 @@ export const artifactService = {
       content: input.content ?? "",
       updatedAt: now,
       versions: [{ id: `v_${Date.now()}`, createdAt: now, note: "Versão inicial" }],
+      sourceType: input.sourceType ?? "frontend",
+      sourceProduct: input.sourceProduct ?? "orbeAI",
+      sourceEntityId: input.sourceEntityId,
     };
 
     save([a, ...all()]);
@@ -184,6 +201,9 @@ export const artifactService = {
           title: patch.title,
           kind: patch.kind,
           project_id: patch.projectId,
+          source_type: patch.sourceType,
+          source_product: patch.sourceProduct,
+          source_entity_id: patch.sourceEntityId,
         }),
       });
 
