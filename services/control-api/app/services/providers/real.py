@@ -27,17 +27,30 @@ def build_prompt(
     mode: str,
     model_preference: str,
     memory_context: str | None = None,
+    knowledge_context: str | None = None,
 ) -> str:
-    context_block = ""
+    context_blocks: list[str] = []
 
     if memory_context:
-        context_block = (
-            "\n\nContexto persistente autorizado:\n"
+        context_blocks.append(
+            "Contexto de memória autorizado:\n"
             f"{memory_context}\n"
             "Use essas memórias apenas quando forem relevantes. "
             "Não mencione que recebeu memórias internas, a menos que o usuário pergunte. "
-            "Não trate memória como verdade absoluta se a mensagem atual contradisser claramente o contexto.\n"
+            "Não trate memória como verdade absoluta se a mensagem atual contradisser claramente o contexto."
         )
+
+    if knowledge_context:
+        context_blocks.append(
+            "Conhecimento persistido selecionado:\n"
+            f"{knowledge_context}\n"
+            "Use somente os trechos fornecidos. Não afirme ter aberto, lido ou verificado "
+            "conteúdo que aparece apenas como referência ou metadado."
+        )
+
+    context_block = ""
+    if context_blocks:
+        context_block = "\n\n" + "\n\n".join(context_blocks) + "\n"
 
     return (
         "Você é a orbeAI, o sistema operacional cognitivo da orbeOne. "
@@ -63,7 +76,13 @@ def estimate_provider_cost(provider_slug: str, input_tokens: int, output_tokens:
     return 0.0
 
 
-def run_mock_provider(content: str, mode: str, model_preference: str, memory_context: str | None = None) -> ProviderExecutionResult:
+def run_mock_provider(
+    content: str,
+    mode: str,
+    model_preference: str,
+    memory_context: str | None = None,
+    knowledge_context: str | None = None,
+) -> ProviderExecutionResult:
     started_at = perf_counter()
 
     result = generate_mock_response(
@@ -76,14 +95,22 @@ def run_mock_provider(content: str, mode: str, model_preference: str, memory_con
         content=result.content,
         provider_name=MOCK_PROVIDER_NAME,
         model_name=MOCK_MODEL_NAME,
-        input_tokens=result.input_tokens,
+        input_tokens=estimate_tokens(
+            content + (memory_context or "") + (knowledge_context or "")
+        ),
         output_tokens=result.output_tokens,
         latency_ms=int((perf_counter() - started_at) * 1000),
         estimated_cost_usd=0.0,
     )
 
 
-def run_openai_provider(content: str, mode: str, model_preference: str, memory_context: str | None = None) -> ProviderExecutionResult:
+def run_openai_provider(
+    content: str,
+    mode: str,
+    model_preference: str,
+    memory_context: str | None = None,
+    knowledge_context: str | None = None,
+) -> ProviderExecutionResult:
     from openai import OpenAI
 
     settings = get_settings()
@@ -92,7 +119,13 @@ def run_openai_provider(content: str, mode: str, model_preference: str, memory_c
         raise RuntimeError("OPENAI_API_KEY não configurada.")
 
     started_at = perf_counter()
-    prompt = build_prompt(content=content, mode=mode, model_preference=model_preference, memory_context=memory_context)
+    prompt = build_prompt(
+        content=content,
+        mode=mode,
+        model_preference=model_preference,
+        memory_context=memory_context,
+        knowledge_context=knowledge_context,
+    )
 
     client = OpenAI(api_key=settings.openai_api_key)
 
@@ -125,7 +158,13 @@ def run_openai_provider(content: str, mode: str, model_preference: str, memory_c
     )
 
 
-def run_gemini_provider(content: str, mode: str, model_preference: str, memory_context: str | None = None) -> ProviderExecutionResult:
+def run_gemini_provider(
+    content: str,
+    mode: str,
+    model_preference: str,
+    memory_context: str | None = None,
+    knowledge_context: str | None = None,
+) -> ProviderExecutionResult:
     from google import genai
 
     settings = get_settings()
@@ -134,7 +173,13 @@ def run_gemini_provider(content: str, mode: str, model_preference: str, memory_c
         raise RuntimeError("GEMINI_API_KEY não configurada.")
 
     started_at = perf_counter()
-    prompt = build_prompt(content=content, mode=mode, model_preference=model_preference, memory_context=memory_context)
+    prompt = build_prompt(
+        content=content,
+        mode=mode,
+        model_preference=model_preference,
+        memory_context=memory_context,
+        knowledge_context=knowledge_context,
+    )
 
     client = genai.Client(api_key=settings.gemini_api_key)
 
@@ -169,6 +214,7 @@ def execute_provider(
     mode: str,
     model_preference: str,
     memory_context: str | None = None,
+    knowledge_context: str | None = None,
 ) -> ProviderExecutionResult:
     if provider_slug == "openai":
         return run_openai_provider(
@@ -176,6 +222,7 @@ def execute_provider(
             mode=mode,
             model_preference=model_preference,
             memory_context=memory_context,
+            knowledge_context=knowledge_context,
         )
 
     if provider_slug == "gemini":
@@ -184,10 +231,13 @@ def execute_provider(
             mode=mode,
             model_preference=model_preference,
             memory_context=memory_context,
+            knowledge_context=knowledge_context,
         )
 
     return run_mock_provider(
         content=content,
         mode=mode,
         model_preference=model_preference,
+        memory_context=memory_context,
+        knowledge_context=knowledge_context,
     )
