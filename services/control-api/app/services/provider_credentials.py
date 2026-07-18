@@ -3,6 +3,7 @@ from __future__ import annotations
 from base64 import urlsafe_b64encode
 from dataclasses import dataclass
 from hashlib import sha256
+from os import getenv
 from typing import Any
 
 from cryptography.fernet import Fernet, InvalidToken
@@ -83,14 +84,14 @@ def provider_definition(provider_slug: str, settings: Settings | None = None) ->
     return ProviderDefinition(
         slug=definition.slug,
         display_name=definition.display_name,
-        default_model=settings.nvidia_model,
-        base_url=settings.nvidia_base_url,
+        default_model=getenv("NVIDIA_MODEL") or definition.default_model,
+        base_url=getenv("NVIDIA_BASE_URL") or definition.base_url,
     )
 
 
 def _cipher(settings: Settings | None = None) -> Fernet:
     settings = settings or get_settings()
-    master_secret = settings.provider_credentials_master_key or settings.jwt_secret
+    master_secret = getenv("PROVIDER_CREDENTIALS_MASTER_KEY") or settings.jwt_secret
     if not master_secret:
         raise RuntimeError("segredo mestre do cofre de providers não configurado")
     key = urlsafe_b64encode(sha256(master_secret.encode("utf-8")).digest())
@@ -104,7 +105,7 @@ def encrypt_api_key(api_key: str, settings: Settings | None = None) -> str:
 def decrypt_api_key(ciphertext: str, settings: Settings | None = None) -> str:
     try:
         return _cipher(settings).decrypt(ciphertext.encode("ascii")).decode("utf-8")
-    except InvalidToken as exc:
+    except (InvalidToken, ValueError) as exc:
         raise CredentialDecryptionError("credencial armazenada não pôde ser descriptografada") from exc
 
 
@@ -138,13 +139,12 @@ def _environment_credential(
     settings: Settings,
 ) -> ResolvedProviderCredential | None:
     definition = provider_definition(provider_slug, settings)
-    api_key: str | None
     if provider_slug == "openai":
         api_key = settings.openai_api_key
     elif provider_slug == "gemini":
         api_key = settings.gemini_api_key
     elif provider_slug == "nvidia":
-        api_key = settings.nvidia_api_key
+        api_key = getenv("NVIDIA_API_KEY")
     else:
         api_key = None
 
@@ -226,7 +226,6 @@ def upsert_provider_credential(
     meta = dict(workspace_settings.meta or {})
     entries = _credential_entries(db, workspace_id)
     existing = dict(entries.get(provider_slug) or {})
-    now = utc_now().isoformat()
 
     entries[provider_slug] = {
         **existing,
@@ -234,7 +233,7 @@ def upsert_provider_credential(
         "key_hint": key_hint(api_key),
         "model_name": (model_name or definition.default_model).strip(),
         "base_url": definition.base_url,
-        "updated_at": now,
+        "updated_at": utc_now().isoformat(),
         "last_test_status": None,
         "last_tested_at": None,
         "last_test_latency_ms": None,
@@ -320,7 +319,7 @@ def provider_credential_summary(
             "last_test_status": entry.get("last_test_status"),
             "last_tested_at": entry.get("last_tested_at"),
             "last_test_latency_ms": entry.get("last_test_latency_ms"),
-            "last_error_code": entry.get("last_error_code") if not readable else entry.get("last_error_code"),
+            "last_error_code": entry.get("last_error_code"),
         }
 
     environment = _environment_credential(provider_slug, settings)
