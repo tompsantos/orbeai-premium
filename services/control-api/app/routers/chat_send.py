@@ -27,13 +27,8 @@ def get_project_or_404(project_id: str, db: Session, workspace_id: str) -> Proje
         .where(Project.id == project_id)
         .where(Project.workspace_id == workspace_id)
     )
-
     if project is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Project not found",
-        )
-
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
     return project
 
 
@@ -43,37 +38,24 @@ def get_chat_or_404(chat_id: str, db: Session, workspace_id: str) -> Chat:
         .where(Chat.id == chat_id)
         .where(Chat.workspace_id == workspace_id)
     )
-
     if chat is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Chat not found",
-        )
-
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found")
     return chat
 
 
 def get_workspace_or_404(workspace_id: str, db: Session) -> Workspace:
     workspace = db.get(Workspace, workspace_id)
-
     if workspace is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Workspace not found",
-        )
-
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found")
     return workspace
 
 
 def make_chat_title(content: str) -> str:
     clean = " ".join(content.strip().split())
-
     if not clean:
         return "Nova conversa"
-
     if len(clean) <= 72:
         return clean
-
     return clean[:69].rstrip() + "..."
 
 
@@ -83,20 +65,33 @@ def resolve_or_create_chat(
     workspace: Workspace,
 ) -> Chat:
     if payload.chat_id is not None:
-        return get_chat_or_404(payload.chat_id, db, workspace.id)
+        chat = get_chat_or_404(payload.chat_id, db, workspace.id)
+        changed = False
+        if payload.mode is not None and payload.mode != chat.mode:
+            chat.mode = payload.mode
+            changed = True
+        if (
+            payload.model_preference is not None
+            and payload.model_preference != chat.model_preference
+        ):
+            chat.model_preference = payload.model_preference
+            changed = True
+        if changed:
+            chat.updated_at = utc_now()
+            db.add(chat)
+            db.commit()
+            db.refresh(chat)
+        return chat
 
     project_id = payload.project_id
-
     if project_id is not None:
         get_project_or_404(project_id, db, workspace.id)
 
     workspace_settings = get_or_create_workspace_settings(db, workspace)
-
     resolved_mode = payload.mode or workspace_settings.default_chat_mode
     resolved_model_preference = (
         payload.model_preference or workspace_settings.default_model_preference
     )
-
     chat = Chat(
         workspace_id=workspace.id,
         project_id=project_id,
@@ -104,11 +99,9 @@ def resolve_or_create_chat(
         mode=resolved_mode,
         model_preference=resolved_model_preference,
     )
-
     db.add(chat)
     db.commit()
     db.refresh(chat)
-
     return chat
 
 
@@ -119,7 +112,6 @@ def send_chat_message(
     context: CurrentWorkspaceContext = Depends(get_current_workspace_context),
 ) -> ChatSendResponse:
     started_at = perf_counter()
-
     chat = resolve_or_create_chat(payload, db, context.workspace)
 
     user_message = Message(
@@ -143,13 +135,11 @@ def send_chat_message(
             "membership_role": context.role,
         },
     )
-
     db.add(user_message)
     db.commit()
     db.refresh(user_message)
 
     memory_events: list[MemoryEventRead] = []
-
     auto_memory_enabled = is_feature_enabled(
         db=db,
         workspace_id=chat.workspace_id,
@@ -168,7 +158,6 @@ def send_chat_message(
         key="real_providers",
         default=True,
     )
-
     workspace_policy = get_workspace_policy(db, chat.workspace_id)
 
     if auto_memory_enabled:
@@ -179,7 +168,6 @@ def send_chat_message(
             content=payload.content,
             memory_policy=workspace_policy.memory_policy,
         )
-
         if auto_memory_event is not None:
             memory_events.append(
                 MemoryEventRead(
@@ -192,7 +180,6 @@ def send_chat_message(
             )
 
     relevant_memories = []
-
     if memory_context_enabled:
         relevant_memories = select_relevant_memories(
             db=db,
@@ -201,7 +188,6 @@ def send_chat_message(
             query=payload.content,
             limit=memory_context_limit(workspace_policy.memory_policy),
         )
-
     memory_context = build_memory_context(relevant_memories)
 
     decision = resolve_chat_route(
@@ -209,6 +195,8 @@ def send_chat_message(
         mode=chat.mode,
         model_preference=chat.model_preference,
         routing_mode="automático",
+        real_providers_enabled=real_providers_enabled,
+        workspace_id=chat.workspace_id,
     )
 
     history_rows = list(
@@ -242,6 +230,7 @@ def send_chat_message(
     provider_error = runtime_execution.provider_error
     cognition_error = runtime_execution.cognition_error
     router_reason = runtime_execution.router_reason
+    decision_payload = decision.persisted_payload()
 
     assistant_message = Message(
         chat_id=chat.id,
@@ -257,6 +246,8 @@ def send_chat_message(
             "router_selected_provider": selected_provider_slug,
             "router_is_fallback": decision.is_fallback
             or runtime_execution.used_legacy_fallback,
+            "router_decision": decision_payload,
+            "provider_attempts": runtime_execution.provider_attempts,
             "runtime": runtime_execution.runtime_name,
             "provider_error": provider_error,
             "cognition_error": cognition_error,
@@ -274,16 +265,13 @@ def send_chat_message(
             "membership_role": context.role,
         },
     )
-
     chat.updated_at = utc_now()
-
     db.add(assistant_message)
     db.add(chat)
     db.commit()
     db.refresh(assistant_message)
 
     latency_ms = int((perf_counter() - started_at) * 1000)
-
     model_run = ModelRun(
         workspace_id=chat.workspace_id,
         chat_id=chat.id,
@@ -300,7 +288,6 @@ def send_chat_message(
         fallback_chain=decision.fallback_chain,
         error_message=provider_error,
     )
-
     db.add(model_run)
     db.flush()
 
@@ -317,6 +304,9 @@ def send_chat_message(
             "model": result.model_name,
             "input_tokens": result.input_tokens,
             "output_tokens": result.output_tokens,
+            "latency_ms": latency_ms,
+            "router_decision": decision_payload,
+            "provider_attempts": runtime_execution.provider_attempts,
             "memory_context_count": len(relevant_memories),
             "memory_event_count": len(memory_events),
             "provider_error": provider_error,
@@ -356,7 +346,6 @@ def send_chat_message(
 
     db.commit()
     db.refresh(model_run)
-
     return ChatSendResponse(
         chat_id=chat.id,
         provider=result.provider_name,
