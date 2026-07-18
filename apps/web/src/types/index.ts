@@ -141,6 +141,9 @@ export interface Artifact {
   content: string;
   updatedAt: string;
   versions: ArtifactVersion[];
+  sourceType?: string;
+  sourceProduct?: string;
+  sourceEntityId?: string;
 }
 
 export interface MemoryItem {
@@ -318,4 +321,3 @@ export interface WorkspaceInfo {
   updatedAt: string;
   settings: WorkspaceSettings;
 }
-

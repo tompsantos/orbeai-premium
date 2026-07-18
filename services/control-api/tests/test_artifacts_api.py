@@ -12,6 +12,9 @@ def test_artifact_crud_and_versions() -> None:
             "title": "Plano executivo",
             "kind": "documento",
             "content": "versão inicial",
+            "source_type": "chat",
+            "source_product": "orbeAI",
+            "source_entity_id": "message_test_456",
         },
     )
 
@@ -19,6 +22,9 @@ def test_artifact_crud_and_versions() -> None:
     artifact = create_response.json()
 
     assert artifact["title"] == "Plano executivo"
+    assert artifact["source_type"] == "chat"
+    assert artifact["source_product"] == "orbeAI"
+    assert artifact["source_entity_id"] == "message_test_456"
     assert artifact["versions"][0]["content"] == "versão inicial"
     assert artifact["versions"][0]["version_number"] == 1
 
@@ -39,6 +45,7 @@ def test_artifact_crud_and_versions() -> None:
 
     updated = get_response.json()
     assert len(updated["versions"]) == 2
+    assert updated["source_entity_id"] == "message_test_456"
 
     delete_response = client.delete(f"/v1/artifacts/{artifact['id']}")
     assert delete_response.status_code == 204

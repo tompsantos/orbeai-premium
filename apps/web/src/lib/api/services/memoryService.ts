@@ -145,16 +145,19 @@ export const memoryService = {
           content: input.content,
           scope: fromScope(input.scope) ?? "projeto",
           status: input.status ?? "pendente",
+          sensitivity: input.sensitivity ?? "normal",
           confidence: input.confidence ?? 0.8,
           project_id: input.projectId,
           source_type: input.source ?? "manual",
-          source_product: "orbeAI",
+          source_product: input.sourceProduct ?? "orbeAI",
+          source_entity_id: input.sourceEntityId,
         }),
       });
 
       return toMemoryItem(memory);
     }
 
+    const now = new Date().toISOString();
     const item: MemoryItemExt = {
       id: `mem_${Date.now()}`,
       scope: input.scope ?? "projeto",
@@ -162,9 +165,14 @@ export const memoryService = {
       content: input.content,
       source: input.source ?? "manual",
       confidence: input.confidence ?? 0.8,
-      lastUsed: new Date().toISOString(),
+      lastUsed: now,
       status: input.status ?? "pendente",
       projectId: input.projectId,
+      sensitivity: input.sensitivity ?? "normal",
+      sourceProduct: input.sourceProduct ?? "orbeAI",
+      sourceEntityId: input.sourceEntityId,
+      createdAt: now,
+      updatedAt: now,
       reason: input.reason,
     };
 
@@ -183,9 +191,12 @@ export const memoryService = {
           content: patch.content,
           scope: fromScope(patch.scope),
           status: patch.status,
+          sensitivity: patch.sensitivity,
           confidence: patch.confidence,
           project_id: patch.projectId,
           source_type: patch.source,
+          source_product: patch.sourceProduct,
+          source_entity_id: patch.sourceEntityId,
         }),
       });
 
@@ -197,7 +208,7 @@ export const memoryService = {
 
     if (idx < 0) return null;
 
-    list[idx] = { ...list[idx], ...patch };
+    list[idx] = { ...list[idx], ...patch, updatedAt: new Date().toISOString() };
     save(list);
 
     return list[idx];
