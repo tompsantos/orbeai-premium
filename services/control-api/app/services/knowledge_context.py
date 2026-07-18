@@ -75,8 +75,11 @@ def _report_source(
     if not report.summary.strip():
         return None
 
-    score = _base_score(query, report.question, body)
-    score += _project_boost(report.project_id, project_id)
+    lexical_score = _base_score(query, report.question, body)
+    if lexical_score <= 0:
+        return None
+
+    score = lexical_score + _project_boost(report.project_id, project_id)
 
     if report.status == "concluído":
         score += 0.05
@@ -100,8 +103,11 @@ def _material_source(
     if not material.excerpt.strip():
         return None
 
-    score = _base_score(query, material.title, material.excerpt)
-    score += _project_boost(material.project_id, project_id)
+    lexical_score = _base_score(query, material.title, material.excerpt)
+    if lexical_score <= 0:
+        return None
+
+    score = lexical_score + _project_boost(material.project_id, project_id)
     score += min(max(material.confidence, 0.0), 1.0) * 0.05
 
     meta = material.meta or {}
