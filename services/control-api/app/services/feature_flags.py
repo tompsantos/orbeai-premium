@@ -26,6 +26,13 @@ DEFAULT_FLAGS = [
         "description": "Permite usar memórias ativas como contexto persistente no chat.",
     },
     {
+        "key": "knowledge_context",
+        "label": "Contexto com conhecimento",
+        "enabled": True,
+        "audience": "interno",
+        "description": "Permite selecionar pesquisas e materiais persistidos relevantes para o chat.",
+    },
+    {
         "key": "audit_logs",
         "label": "Audit logs reais",
         "enabled": True,
