@@ -30,6 +30,7 @@ from app.services.cognition_client import (
     stream_cognition_turn,
 )
 from app.services.feature_flags import is_feature_enabled
+from app.services.knowledge_context import KnowledgeContextSource, resolve_knowledge_context
 from app.services.live_run_registry import (
     LiveRunOwner,
     get_owned_live_run,
@@ -74,6 +75,9 @@ class LiveTurnContext:
     memory_events: list[MemoryEventRead]
     memory_context: str | None
     memory_context_count: int
+    knowledge_context: str | None
+    knowledge_sources: list[KnowledgeContextSource]
+    knowledge_context_enabled: bool
     conversation_history: list[dict[str, Any]]
     decision: RouterDecision
     workspace_policy: WorkspacePolicy
@@ -141,6 +145,22 @@ def _prepare_live_turn(
         key="real_providers",
         default=True,
     )
+    knowledge_context_enabled = is_feature_enabled(
+        db=db,
+        workspace_id=chat.workspace_id,
+        key="knowledge_context",
+        default=True,
+    )
+    knowledge_context: str | None = None
+    knowledge_sources: list[KnowledgeContextSource] = []
+    if knowledge_context_enabled:
+        knowledge_context, knowledge_sources = resolve_knowledge_context(
+            workspace_id=chat.workspace_id,
+            chat_id=chat.id,
+            query=payload.content,
+            request_id=request_id,
+        )
+
     workspace_policy = get_workspace_policy(db, chat.workspace_id)
     memory_events: list[MemoryEventRead] = []
 
@@ -216,6 +236,9 @@ def _prepare_live_turn(
         memory_events=memory_events,
         memory_context=build_memory_context(relevant_memories),
         memory_context_count=len(relevant_memories),
+        knowledge_context=knowledge_context,
+        knowledge_sources=knowledge_sources,
+        knowledge_context_enabled=knowledge_context_enabled,
         conversation_history=conversation_history,
         decision=decision,
         workspace_policy=workspace_policy,
@@ -243,6 +266,10 @@ def _finalize_live_turn(
         if chat is None or user_message is None:
             raise RuntimeError("turno vivo perdeu o contexto persistido")
 
+        knowledge_source_payloads = [
+            source.public_payload() for source in turn.knowledge_sources
+        ]
+
         assistant_message = Message(
             chat_id=chat.id,
             role="assistant",
@@ -263,8 +290,11 @@ def _finalize_live_turn(
                 "cognition_error": cognition_error,
                 "memory_context_count": turn.memory_context_count,
                 "memory_event_count": len(turn.memory_events),
+                "knowledge_context_count": len(turn.knowledge_sources),
+                "knowledge_sources": knowledge_source_payloads,
                 "feature_auto_memory_enabled": turn.auto_memory_enabled,
                 "feature_memory_context_enabled": turn.memory_context_enabled,
+                "feature_knowledge_context_enabled": turn.knowledge_context_enabled,
                 "feature_real_providers_enabled": turn.real_providers_enabled,
                 "workspace_memory_policy": turn.workspace_policy.memory_policy,
                 "auth_user_id": turn.user_id,
@@ -314,6 +344,8 @@ def _finalize_live_turn(
                 "status": run_status,
                 "memory_context_count": turn.memory_context_count,
                 "memory_event_count": len(turn.memory_events),
+                "knowledge_context_count": len(turn.knowledge_sources),
+                "knowledge_sources": knowledge_source_payloads,
                 "provider_error": provider_error,
                 "cognition_error": cognition_error,
                 "used_legacy_fallback": used_legacy_fallback,
@@ -364,6 +396,7 @@ def _legacy_fallback(turn: LiveTurnContext) -> tuple[ProviderExecutionResult, st
                 mode=turn.chat_mode,
                 model_preference=turn.model_preference,
                 memory_context=turn.memory_context,
+                knowledge_context=turn.knowledge_context,
             ),
             None,
         )
@@ -375,6 +408,7 @@ def _legacy_fallback(turn: LiveTurnContext) -> tuple[ProviderExecutionResult, st
                 mode=turn.chat_mode,
                 model_preference=turn.model_preference,
                 memory_context=turn.memory_context,
+                knowledge_context=turn.knowledge_context,
             ),
             error,
         )
@@ -398,7 +432,9 @@ def _cognition_result(turn: LiveTurnContext, content: str, model: str) -> Provid
         content=content,
         provider_name="orbe-cognition",
         model_name=model or "orbe-cognition-default",
-        input_tokens=estimate_tokens(turn.content + (turn.memory_context or "")),
+        input_tokens=estimate_tokens(
+            turn.content + (turn.memory_context or "") + (turn.knowledge_context or "")
+        ),
         output_tokens=estimate_tokens(content),
         latency_ms=int((perf_counter() - turn.started_at) * 1000),
         estimated_cost_usd=0.0,
@@ -419,6 +455,15 @@ def _stream_live_turn(turn: LiveTurnContext) -> Iterator[str]:
         runtime="orbe-cognition" if settings.cognition_enabled else "legacy-provider",
     )
 
+    if turn.knowledge_sources:
+        yield _sse(
+            "knowledge.context",
+            request_id=turn.request_id,
+            chat_id=turn.chat_id,
+            source_count=len(turn.knowledge_sources),
+            sources=[source.public_payload() for source in turn.knowledge_sources],
+        )
+
     try:
         if settings.cognition_enabled:
             try:
@@ -431,6 +476,8 @@ def _stream_live_turn(turn: LiveTurnContext) -> Iterator[str]:
                     mode=turn.chat_mode,
                     memory_context=turn.memory_context,
                     conversation_history=turn.conversation_history,
+                    knowledge_context=turn.knowledge_context,
+                    knowledge_context_resolved=True,
                 ):
                     event_type = str(event.get("type") or "message")
 

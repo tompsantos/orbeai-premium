@@ -161,10 +161,11 @@ def stream_cognition_turn(
     memory_context: str | None,
     conversation_history: list[dict[str, Any]],
     knowledge_context: str | None = None,
+    knowledge_context_resolved: bool = False,
 ) -> Iterator[dict[str, Any]]:
     settings = get_settings()
 
-    if knowledge_context is None:
+    if knowledge_context is None and not knowledge_context_resolved:
         knowledge_context, sources = resolve_knowledge_context(
             workspace_id=workspace_id,
             chat_id=chat_id,
