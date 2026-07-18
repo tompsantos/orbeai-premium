@@ -1,13 +1,17 @@
+from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from app.db.session import SessionLocal
+from app.main import app
 from app.models import WorkspaceSettings
 from app.services.orbe_router import ExecutionStrategy, resolve_chat_route
 from app.services.provider_credentials import resolve_provider_credential
 from app.services.providers.real import ProviderExecutionResult
 
+client = TestClient(app)
 
-def test_provider_credential_is_encrypted_and_never_returned(client) -> None:
+
+def test_provider_credential_is_encrypted_and_never_returned() -> None:
     raw_key = "test-openai-key-with-secret-tail-4821"
 
     response = client.put(
@@ -44,7 +48,7 @@ def test_provider_credential_is_encrypted_and_never_returned(client) -> None:
         assert resolved.model_name == "openai-test-model"
 
 
-def test_workspace_settings_cannot_overwrite_reserved_provider_vault(client) -> None:
+def test_workspace_settings_cannot_overwrite_reserved_provider_vault() -> None:
     save = client.put(
         "/v1/provider-credentials/gemini",
         json={"api_key": "test-gemini-secret-9927", "model_name": "gemini-test-model"},
@@ -63,7 +67,7 @@ def test_workspace_settings_cannot_overwrite_reserved_provider_vault(client) -> 
     assert gemini["key_hint"] == "••••9927"
 
 
-def test_provider_test_uses_saved_credential_without_exposing_it(client, monkeypatch) -> None:
+def test_provider_test_uses_saved_credential_without_exposing_it(monkeypatch) -> None:
     save = client.put(
         "/v1/provider-credentials/nvidia",
         json={
@@ -102,7 +106,7 @@ def test_provider_test_uses_saved_credential_without_exposing_it(client, monkeyp
     assert "test-nvidia-secret-7714" not in response.text
 
 
-def test_router_can_select_nvidia_from_workspace_vault(client) -> None:
+def test_router_can_select_nvidia_from_workspace_vault() -> None:
     save = client.put(
         "/v1/provider-credentials/nvidia",
         json={
