@@ -444,6 +444,8 @@ export function useChatExperience() {
       source: "chat",
       status: "pendente",
       projectId: project?.id,
+      sourceProduct: "orbeAI",
+      sourceEntityId: message.id,
       reason: "Salvo a partir de resposta do chat",
     });
     setMemories(await memoryService.list());
@@ -456,6 +458,9 @@ export function useChatExperience() {
       kind: "documento",
       content: message.content,
       projectId: project?.id,
+      sourceType: "chat",
+      sourceProduct: "orbeAI",
+      sourceEntityId: message.id,
     });
     setArtifacts(await artifactService.list());
     toast.success("Item criado na Biblioteca", { description: artifact.title });
