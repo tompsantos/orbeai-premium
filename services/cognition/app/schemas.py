@@ -58,4 +58,5 @@ class CapabilitiesResponse(BaseModel):
     approvals: bool
     scoped_builtin_memory: bool
     external_memory_context: bool
+    external_knowledge_context: bool
     tool_policy: bool
