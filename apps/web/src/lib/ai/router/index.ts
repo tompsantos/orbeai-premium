@@ -13,8 +13,8 @@ export interface RouterDecision {
   reason: string;
   fallbackChain: ProviderSlug[];
   routingMode: RoutingMode;
-  estimatedLatencyMs?: number;
-  estimatedCostUsd?: number;
+  estimatedLatencyMs: number;
+  estimatedCostUsd: number;
   qualityTier: QualityTier;
   taskHints: TaskHint[];
   debugInfo?: Record<string, unknown>;
