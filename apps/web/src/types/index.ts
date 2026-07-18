@@ -73,6 +73,7 @@ export type ModelKey =
   | "gpt"
   | "claude"
   | "gemini"
+  | "nvidia"
   | "qwen"
   | "groq"
   | "local";
@@ -152,7 +153,7 @@ export interface MemoryItem {
   label: string;
   content: string;
   source: "chat" | "documento" | "manual" | "agente";
-  confidence: number; // 0-1
+  confidence: number;
   lastUsed: string;
   status: "ativa" | "pendente" | "arquivada";
   projectId?: ID;
@@ -182,7 +183,15 @@ export interface Integration {
   permissions: string[];
 }
 
-export type ProviderSlug = "openai" | "anthropic" | "gemini" | "qwen" | "groq" | "local" | "mock";
+export type ProviderSlug =
+  | "openai"
+  | "anthropic"
+  | "gemini"
+  | "nvidia"
+  | "qwen"
+  | "groq"
+  | "local"
+  | "mock";
 
 export interface ModelProvider {
   slug: ProviderSlug;
