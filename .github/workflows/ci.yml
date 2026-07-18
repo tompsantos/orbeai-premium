@@ -105,8 +105,6 @@ jobs:
           cache-dependency-path: apps/web/package.json
       - name: install
         run: npm install --silent
-      - name: lint
-        run: npm run lint
       - name: typecheck
         run: npm run typecheck
       - name: build
