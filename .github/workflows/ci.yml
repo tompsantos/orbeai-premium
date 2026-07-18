@@ -130,6 +130,30 @@ jobs:
       - name: install
         run: npm install --silent
       - name: typecheck
-        run: npm run typecheck
+        id: web_typecheck
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          npm run typecheck 2>&1 | tee /tmp/web-typecheck.log
       - name: build
-        run: npm run build
+        id: web_build
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          npm run build 2>&1 | tee /tmp/web-build.log
+      - name: upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-diagnostics
+          path: |
+            /tmp/web-typecheck.log
+            /tmp/web-build.log
+          retention-days: 7
+          if-no-files-found: warn
+      - name: enforce quality gate
+        if: steps.web_typecheck.outcome == 'failure' || steps.web_build.outcome == 'failure'
+        run: |
+          echo "typecheck=${{ steps.web_typecheck.outcome }}"
+          echo "build=${{ steps.web_build.outcome }}"
+          exit 1
