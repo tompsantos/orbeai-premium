@@ -17,6 +17,7 @@ DEFAULT_FLAG_STATE = {
     "real_providers": True,
     "auto_memory": True,
     "memory_context": True,
+    "knowledge_context": True,
     "audit_logs": True,
     "artifact_versions": True,
 }
@@ -62,6 +63,7 @@ def reset_runtime_state() -> None:
         db.commit()
     finally:
         db.close()
+
 
 AUTH_REAL_TEST_FILES = {
     "test_auth_api.py",
