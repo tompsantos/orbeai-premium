@@ -81,6 +81,11 @@ jobs:
         run: python -m pip install -q -e ".[dev]"
       - name: migrate test database
         run: alembic upgrade head
+      - name: diagnose import ordering
+        run: |
+          ruff check app/schemas/knowledge.py --select I --fix
+          git diff -- app/schemas/knowledge.py > /tmp/control-api-import-fix.diff
+          git checkout -- app/schemas/knowledge.py
       - name: lint
         id: control_lint
         continue-on-error: true
@@ -99,6 +104,7 @@ jobs:
         with:
           name: control-api-diagnostics
           path: |
+            /tmp/control-api-import-fix.diff
             /tmp/control-api-ruff.log
             /tmp/control-api-pytest.log
           retention-days: 7
