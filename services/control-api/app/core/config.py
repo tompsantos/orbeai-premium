@@ -22,7 +22,6 @@ class Settings(BaseSettings):
         default="postgresql+psycopg://orbeai:orbeai@localhost:5433/orbeai",
         validation_alias="DATABASE_URL",
     )
-
     cors_origins: str = Field(
         default="http://localhost:8080,http://localhost:5173,http://localhost:3000",
         validation_alias="BACKEND_CORS_ORIGINS",
@@ -40,6 +39,18 @@ class Settings(BaseSettings):
     openai_model: str = Field(default="gpt-5.5", validation_alias="OPENAI_MODEL")
     gemini_model: str = Field(default="gemini-3.5-flash", validation_alias="GEMINI_MODEL")
     enable_real_providers: bool = Field(default=False, validation_alias="ENABLE_REAL_PROVIDERS")
+    provider_timeout_seconds: float = Field(
+        default=60.0,
+        validation_alias="PROVIDER_TIMEOUT_SECONDS",
+        gt=0,
+        le=600,
+    )
+    provider_retry_attempts: int = Field(
+        default=1,
+        validation_alias="PROVIDER_RETRY_ATTEMPTS",
+        ge=0,
+        le=3,
+    )
 
     cognition_enabled: bool = Field(default=True, validation_alias="COGNITION_ENABLED")
     cognition_base_url: str = Field(
@@ -59,10 +70,22 @@ class Settings(BaseSettings):
         validation_alias="COGNITION_FALLBACK_TO_LEGACY",
     )
 
-    openai_input_price_per_m_tokens: float = Field(default=2.50, validation_alias="OPENAI_INPUT_PRICE_PER_M_TOKENS")
-    openai_output_price_per_m_tokens: float = Field(default=15.00, validation_alias="OPENAI_OUTPUT_PRICE_PER_M_TOKENS")
-    gemini_input_price_per_m_tokens: float = Field(default=0.0, validation_alias="GEMINI_INPUT_PRICE_PER_M_TOKENS")
-    gemini_output_price_per_m_tokens: float = Field(default=0.0, validation_alias="GEMINI_OUTPUT_PRICE_PER_M_TOKENS")
+    openai_input_price_per_m_tokens: float = Field(
+        default=0.0,
+        validation_alias="OPENAI_INPUT_PRICE_PER_M_TOKENS",
+    )
+    openai_output_price_per_m_tokens: float = Field(
+        default=0.0,
+        validation_alias="OPENAI_OUTPUT_PRICE_PER_M_TOKENS",
+    )
+    gemini_input_price_per_m_tokens: float = Field(
+        default=0.0,
+        validation_alias="GEMINI_INPUT_PRICE_PER_M_TOKENS",
+    )
+    gemini_output_price_per_m_tokens: float = Field(
+        default=0.0,
+        validation_alias="GEMINI_OUTPUT_PRICE_PER_M_TOKENS",
+    )
 
     @property
     def cors_origin_list(self) -> list[str]:

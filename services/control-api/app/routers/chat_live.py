@@ -40,13 +40,20 @@ from app.services.live_run_registry import (
     unregister_live_run,
 )
 from app.services.memory_context import build_memory_context, select_relevant_memories
-from app.services.orbe_router import RouterDecision, resolve_chat_route
-from app.services.providers.mock import estimate_tokens
-from app.services.providers.real import (
-    ProviderExecutionResult,
-    execute_provider,
-    run_mock_provider,
+from app.services.orbe_router import (
+    ExecutionPlan,
+    ExecutionStrategy,
+    RouterDecision,
+    resolve_chat_route,
+    resolve_legacy_chat_route,
 )
+from app.services.provider_gateway import (
+    GatewayExecution,
+    ProviderGatewayError,
+    execute_provider_plan,
+)
+from app.services.providers.mock import estimate_tokens
+from app.services.providers.real import ProviderExecutionResult
 from app.services.workspace_policies import (
     WorkspacePolicy,
     get_workspace_policy,
@@ -84,6 +91,7 @@ class LiveTurnContext:
     auto_memory_enabled: bool
     memory_context_enabled: bool
     real_providers_enabled: bool
+    router_v1_enabled: bool
     started_at: float
 
 
@@ -101,6 +109,7 @@ def _prepare_live_turn(
     db: Session,
     context: CurrentWorkspaceContext,
 ) -> LiveTurnContext:
+    settings = get_settings()
     started_at = perf_counter()
     chat = resolve_or_create_chat(payload, db, context.workspace)
     request_id = f"live_{uuid4().hex}"
@@ -151,6 +160,13 @@ def _prepare_live_turn(
         key="knowledge_context",
         default=True,
     )
+    router_v1_enabled = is_feature_enabled(
+        db=db,
+        workspace_id=chat.workspace_id,
+        key="orbe_router_v1",
+        default=True,
+    )
+
     knowledge_context: str | None = None
     knowledge_sources: list[KnowledgeContextSource] = []
     if knowledge_context_enabled:
@@ -192,6 +208,7 @@ def _prepare_live_turn(
             query=payload.content,
             limit=memory_context_limit(workspace_policy.memory_policy),
         )
+    memory_context = build_memory_context(relevant_memories)
 
     history_rows = list(
         db.scalars(
@@ -206,12 +223,46 @@ def _prepare_live_turn(
         for message in history_rows
         if message.role in {"user", "assistant", "system"}
     ]
-    decision = resolve_chat_route(
+
+    resolver = resolve_chat_route if router_v1_enabled else resolve_legacy_chat_route
+    decision = resolver(
         content=payload.content,
         mode=chat.mode,
         model_preference=chat.model_preference,
         routing_mode="automático",
+        memory_context_count=len(relevant_memories) if router_v1_enabled else 0,
+        knowledge_context_count=len(knowledge_sources) if router_v1_enabled else 0,
+        cognition_enabled=settings.cognition_enabled,
+        real_providers_enabled=real_providers_enabled,
+    ) if router_v1_enabled else resolver(
+        content=payload.content,
+        mode=chat.mode,
+        model_preference=chat.model_preference,
+        routing_mode="automático",
+        cognition_enabled=settings.cognition_enabled,
+        real_providers_enabled=real_providers_enabled,
     )
+
+    decision_payload = decision.persisted_payload()
+    user_message.meta = {**(user_message.meta or {}), "router_decision": decision_payload}
+    db.add(user_message)
+    write_audit_log(
+        db=db,
+        workspace_id=chat.workspace_id,
+        action="router.decision",
+        resource_type="message",
+        resource_id=user_message.id,
+        request_id=request_id,
+        meta={
+            "chat_id": chat.id,
+            "router_v1_enabled": router_v1_enabled,
+            "decision": decision_payload,
+            "auth_user_id": context.user_id,
+            "membership_role": context.role,
+        },
+    )
+    db.commit()
+    db.refresh(user_message)
 
     register_live_run(
         LiveRunOwner(
@@ -234,7 +285,7 @@ def _prepare_live_turn(
         user_message_id=user_message.id,
         user_message=MessageRead.model_validate(user_message).model_dump(mode="json"),
         memory_events=memory_events,
-        memory_context=build_memory_context(relevant_memories),
+        memory_context=memory_context,
         memory_context_count=len(relevant_memories),
         knowledge_context=knowledge_context,
         knowledge_sources=knowledge_sources,
@@ -245,6 +296,7 @@ def _prepare_live_turn(
         auto_memory_enabled=auto_memory_enabled,
         memory_context_enabled=memory_context_enabled,
         real_providers_enabled=real_providers_enabled,
+        router_v1_enabled=router_v1_enabled,
         started_at=started_at,
     )
 
@@ -257,7 +309,9 @@ def _finalize_live_turn(
     run_status: str = "success",
     provider_error: str | None = None,
     cognition_error: str | None = None,
-    used_legacy_fallback: bool = False,
+    provider_attempts: list[dict[str, object]] | None = None,
+    used_provider_fallback: bool = False,
+    used_cognition_fallback: bool = False,
 ) -> ChatSendResponse:
     db = SessionLocal()
     try:
@@ -269,6 +323,13 @@ def _finalize_live_turn(
         knowledge_source_payloads = [
             source.public_payload() for source in turn.knowledge_sources
         ]
+        decision_payload = turn.decision.persisted_payload()
+        latency_ms = int((perf_counter() - turn.started_at) * 1000)
+        actual_fallback = (
+            turn.decision.is_fallback
+            or used_provider_fallback
+            or used_cognition_fallback
+        )
 
         assistant_message = Message(
             chat_id=chat.id,
@@ -281,13 +342,18 @@ def _finalize_live_turn(
             meta={
                 "source": "chat-live",
                 "request_id": turn.request_id,
+                "router_decision": decision_payload,
                 "router_primary_provider": turn.decision.primary_provider_slug,
                 "router_selected_provider": result.provider_name,
-                "router_is_fallback": turn.decision.is_fallback or used_legacy_fallback,
+                "router_is_fallback": actual_fallback,
+                "provider_attempts": provider_attempts or [],
                 "runtime": runtime_name,
                 "run_status": run_status,
+                "latency_ms": latency_ms,
                 "provider_error": provider_error,
                 "cognition_error": cognition_error,
+                "used_provider_fallback": used_provider_fallback,
+                "used_cognition_fallback": used_cognition_fallback,
                 "memory_context_count": turn.memory_context_count,
                 "memory_event_count": len(turn.memory_events),
                 "knowledge_context_count": len(turn.knowledge_sources),
@@ -296,6 +362,7 @@ def _finalize_live_turn(
                 "feature_memory_context_enabled": turn.memory_context_enabled,
                 "feature_knowledge_context_enabled": turn.knowledge_context_enabled,
                 "feature_real_providers_enabled": turn.real_providers_enabled,
+                "feature_orbe_router_v1_enabled": turn.router_v1_enabled,
                 "workspace_memory_policy": turn.workspace_policy.memory_policy,
                 "auth_user_id": turn.user_id,
                 "auth_workspace_id": turn.workspace_id,
@@ -308,14 +375,13 @@ def _finalize_live_turn(
         db.commit()
         db.refresh(assistant_message)
 
-        latency_ms = int((perf_counter() - turn.started_at) * 1000)
         model_run = ModelRun(
             workspace_id=turn.workspace_id,
             chat_id=turn.chat_id,
             message_id=assistant_message.id,
             provider_name=result.provider_name,
             model_name=result.model_name,
-            task_type="chat.live",
+            task_type=f"chat.live.{turn.decision.execution_strategy.value}",
             status=run_status,
             latency_ms=latency_ms,
             input_tokens=result.input_tokens,
@@ -342,13 +408,17 @@ def _finalize_live_turn(
                 "model": result.model_name,
                 "runtime": runtime_name,
                 "status": run_status,
+                "latency_ms": latency_ms,
+                "router_decision": decision_payload,
+                "provider_attempts": provider_attempts or [],
                 "memory_context_count": turn.memory_context_count,
                 "memory_event_count": len(turn.memory_events),
                 "knowledge_context_count": len(turn.knowledge_sources),
                 "knowledge_sources": knowledge_source_payloads,
                 "provider_error": provider_error,
                 "cognition_error": cognition_error,
-                "used_legacy_fallback": used_legacy_fallback,
+                "used_provider_fallback": used_provider_fallback,
+                "used_cognition_fallback": used_cognition_fallback,
                 "auth_user_id": turn.user_id,
                 "membership_role": turn.membership_role,
             },
@@ -386,34 +456,6 @@ def _finalize_live_turn(
         db.close()
 
 
-def _legacy_fallback(turn: LiveTurnContext) -> tuple[ProviderExecutionResult, str | None]:
-    selected_provider = turn.decision.provider_slug if turn.real_providers_enabled else "mock"
-    try:
-        return (
-            execute_provider(
-                provider_slug=selected_provider,
-                content=turn.content,
-                mode=turn.chat_mode,
-                model_preference=turn.model_preference,
-                memory_context=turn.memory_context,
-                knowledge_context=turn.knowledge_context,
-            ),
-            None,
-        )
-    except Exception as exc:
-        error = f"{type(exc).__name__}: {exc}"
-        return (
-            run_mock_provider(
-                content=turn.content,
-                mode=turn.chat_mode,
-                model_preference=turn.model_preference,
-                memory_context=turn.memory_context,
-                knowledge_context=turn.knowledge_context,
-            ),
-            error,
-        )
-
-
 def _text_chunks(content: str, target: int = 56) -> Iterator[str]:
     chunk = ""
     for word in content.split(" "):
@@ -441,6 +483,113 @@ def _cognition_result(turn: LiveTurnContext, content: str, model: str) -> Provid
     )
 
 
+def _direct_plan(turn: LiveTurnContext) -> ExecutionPlan:
+    plan = turn.decision.execution_plan
+    return ExecutionPlan(
+        strategy=ExecutionStrategy.DIRECT_PROVIDER,
+        route_kind=plan.route_kind,
+        primary_provider_slug=plan.primary_provider_slug,
+        provider_chain=plan.provider_chain,
+        model_by_provider=plan.model_by_provider,
+        capability_ids=plan.capability_ids,
+        timeout_seconds=plan.timeout_seconds,
+        retry_attempts=plan.retry_attempts,
+        allow_mock=plan.allow_mock,
+        implemented=plan.implemented,
+    )
+
+
+def _execute_direct(turn: LiveTurnContext) -> GatewayExecution:
+    return execute_provider_plan(
+        _direct_plan(turn),
+        content=turn.content,
+        mode=turn.chat_mode,
+        model_preference=turn.model_preference,
+        memory_context=turn.memory_context,
+        knowledge_context=turn.knowledge_context,
+        real_providers_enabled=turn.real_providers_enabled,
+    )
+
+
+def _stream_direct_execution(
+    turn: LiveTurnContext,
+    execution: GatewayExecution,
+    *,
+    cognition_error: str | None = None,
+    used_cognition_fallback: bool = False,
+) -> Iterator[str]:
+    result = execution.result
+    streamed = ""
+    attempts = execution.attempts_payload()
+    provider_error = next(
+        (
+            str(attempt.get("error"))
+            for attempt in attempts
+            if attempt.get("status") == "failed" and attempt.get("error")
+        ),
+        None,
+    )
+
+    for chunk in _text_chunks(result.content):
+        if live_run_stop_requested(turn.request_id):
+            if streamed.strip():
+                stopped_result = ProviderExecutionResult(
+                    content=streamed.strip(),
+                    provider_name=result.provider_name,
+                    model_name=result.model_name,
+                    input_tokens=result.input_tokens,
+                    output_tokens=estimate_tokens(streamed),
+                    latency_ms=result.latency_ms,
+                    estimated_cost_usd=result.estimated_cost_usd,
+                )
+                response_data = _finalize_live_turn(
+                    turn,
+                    stopped_result,
+                    runtime_name="direct-provider",
+                    run_status="stopped",
+                    provider_error=provider_error,
+                    cognition_error=cognition_error,
+                    provider_attempts=attempts,
+                    used_provider_fallback=execution.used_fallback,
+                    used_cognition_fallback=used_cognition_fallback,
+                ).model_dump(mode="json")
+            else:
+                response_data = None
+            yield _sse(
+                "response.stopped",
+                request_id=turn.request_id,
+                chat_id=turn.chat_id,
+                partial_response=streamed.strip(),
+                response=response_data,
+            )
+            return
+
+        streamed += chunk
+        yield _sse(
+            "response.delta",
+            request_id=turn.request_id,
+            chat_id=turn.chat_id,
+            delta=chunk,
+        )
+
+    response = _finalize_live_turn(
+        turn,
+        result,
+        runtime_name="direct-provider",
+        provider_error=provider_error,
+        cognition_error=cognition_error,
+        provider_attempts=attempts,
+        used_provider_fallback=execution.used_fallback,
+        used_cognition_fallback=used_cognition_fallback,
+    )
+    yield _sse(
+        "response.completed",
+        request_id=turn.request_id,
+        chat_id=turn.chat_id,
+        response=response.model_dump(mode="json"),
+    )
+
+
 def _stream_live_turn(turn: LiveTurnContext) -> Iterator[str]:
     settings = get_settings()
     accumulated = ""
@@ -452,7 +601,13 @@ def _stream_live_turn(turn: LiveTurnContext) -> Iterator[str]:
         request_id=turn.request_id,
         chat_id=turn.chat_id,
         user_message=turn.user_message,
-        runtime="orbe-cognition" if settings.cognition_enabled else "legacy-provider",
+        runtime=turn.decision.execution_strategy.value,
+    )
+    yield _sse(
+        "router.decision",
+        request_id=turn.request_id,
+        chat_id=turn.chat_id,
+        decision=turn.decision.persisted_payload(),
     )
 
     if turn.knowledge_sources:
@@ -465,7 +620,7 @@ def _stream_live_turn(turn: LiveTurnContext) -> Iterator[str]:
         )
 
     try:
-        if settings.cognition_enabled:
+        if turn.decision.execution_strategy is ExecutionStrategy.COGNITION:
             try:
                 for event in stream_cognition_turn(
                     request_id=turn.request_id,
@@ -545,7 +700,11 @@ def _stream_live_turn(turn: LiveTurnContext) -> Iterator[str]:
                 cognition_error = f"{type(exc).__name__}: {exc}"
                 if saw_delta or not settings.cognition_fallback_to_legacy:
                     if accumulated.strip():
-                        result = _cognition_result(turn, accumulated.strip(), "orbe-cognition-default")
+                        result = _cognition_result(
+                            turn,
+                            accumulated.strip(),
+                            "orbe-cognition-default",
+                        )
                         response_data = _finalize_live_turn(
                             turn,
                             result,
@@ -564,71 +723,38 @@ def _stream_live_turn(turn: LiveTurnContext) -> Iterator[str]:
                     )
                     return
 
-        yield _sse(
-            "fallback.started",
-            request_id=turn.request_id,
-            chat_id=turn.chat_id,
-            reason=(
-                "cognition indisponível; contingência segura ativada"
-                if cognition_error
-                else "cognition desativado neste ambiente"
-            ),
-        )
-        result, provider_error = _legacy_fallback(turn)
-        streamed = ""
-        for chunk in _text_chunks(result.content):
-            if live_run_stop_requested(turn.request_id):
-                if streamed.strip():
-                    stopped_result = ProviderExecutionResult(
-                        content=streamed.strip(),
-                        provider_name=result.provider_name,
-                        model_name=result.model_name,
-                        input_tokens=result.input_tokens,
-                        output_tokens=estimate_tokens(streamed),
-                        latency_ms=result.latency_ms,
-                        estimated_cost_usd=result.estimated_cost_usd,
-                    )
-                    response_data = _finalize_live_turn(
-                        turn,
-                        stopped_result,
-                        runtime_name="legacy-provider",
-                        run_status="stopped",
-                        provider_error=provider_error,
-                        cognition_error=cognition_error,
-                        used_legacy_fallback=bool(cognition_error),
-                    ).model_dump(mode="json")
-                else:
-                    response_data = None
                 yield _sse(
-                    "response.stopped",
+                    "fallback.started",
                     request_id=turn.request_id,
                     chat_id=turn.chat_id,
-                    partial_response=streamed.strip(),
-                    response=response_data,
+                    reason="cognition falhou antes de transmitir deltas; gateway direto ativado",
+                )
+                execution = _execute_direct(turn)
+                yield from _stream_direct_execution(
+                    turn,
+                    execution,
+                    cognition_error=cognition_error,
+                    used_cognition_fallback=True,
                 )
                 return
 
-            streamed += chunk
-            yield _sse(
-                "response.delta",
-                request_id=turn.request_id,
-                chat_id=turn.chat_id,
-                delta=chunk,
-            )
-
-        response = _finalize_live_turn(
-            turn,
-            result,
-            runtime_name="legacy-provider",
-            provider_error=provider_error,
-            cognition_error=cognition_error,
-            used_legacy_fallback=bool(cognition_error),
-        )
         yield _sse(
-            "response.completed",
+            "execution.started",
             request_id=turn.request_id,
             chat_id=turn.chat_id,
-            response=response.model_dump(mode="json"),
+            strategy="direct_provider",
+            provider_chain=list(turn.decision.execution_plan.provider_chain),
+        )
+        execution = _execute_direct(turn)
+        yield from _stream_direct_execution(turn, execution)
+    except ProviderGatewayError as exc:
+        yield _sse(
+            "response.failed",
+            request_id=turn.request_id,
+            chat_id=turn.chat_id,
+            error=str(exc),
+            provider_attempts=[attempt.persisted_payload() for attempt in exc.attempts],
+            response=None,
         )
     finally:
         unregister_live_run(turn.request_id)

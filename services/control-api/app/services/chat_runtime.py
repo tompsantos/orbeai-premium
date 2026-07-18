@@ -9,12 +9,9 @@ from app.services.knowledge_context import (
     KnowledgeContextSource,
     resolve_knowledge_context,
 )
-from app.services.orbe_router import RouterDecision
-from app.services.providers.real import (
-    ProviderExecutionResult,
-    execute_provider,
-    run_mock_provider,
-)
+from app.services.orbe_router import ExecutionPlan, ExecutionStrategy, RouterDecision
+from app.services.provider_gateway import GatewayExecution, execute_provider_plan
+from app.services.providers.real import ProviderExecutionResult
 
 
 @dataclass(frozen=True)
@@ -27,6 +24,34 @@ class ChatRuntimeExecution:
     runtime_name: str
     used_legacy_fallback: bool
     knowledge_sources: list[KnowledgeContextSource]
+    provider_attempts: list[dict[str, object]]
+
+
+def _direct_plan(decision: RouterDecision) -> ExecutionPlan:
+    plan = decision.execution_plan
+    return ExecutionPlan(
+        strategy=ExecutionStrategy.DIRECT_PROVIDER,
+        route_kind=plan.route_kind,
+        primary_provider_slug=plan.primary_provider_slug,
+        provider_chain=plan.provider_chain,
+        model_by_provider=plan.model_by_provider,
+        capability_ids=plan.capability_ids,
+        timeout_seconds=plan.timeout_seconds,
+        retry_attempts=plan.retry_attempts,
+        allow_mock=plan.allow_mock,
+        implemented=plan.implemented,
+    )
+
+
+def _provider_error(execution: GatewayExecution) -> str | None:
+    return next(
+        (
+            str(attempt.error)
+            for attempt in execution.attempts
+            if attempt.status == "failed" and attempt.error
+        ),
+        None,
+    )
 
 
 def execute_chat_runtime(
@@ -54,7 +79,7 @@ def execute_chat_runtime(
             query=content,
         )
 
-    if settings.cognition_enabled:
+    if decision.execution_strategy is ExecutionStrategy.COGNITION:
         try:
             result = execute_cognition_turn(
                 workspace_id=workspace_id,
@@ -69,67 +94,44 @@ def execute_chat_runtime(
             return ChatRuntimeExecution(
                 result=result,
                 selected_provider_slug="orbe-cognition",
-                router_reason=(
-                    f"{decision.reason} Execução entregue ao orbe cognition core, "
-                    "runtime principal da orbeAI premium."
-                ),
+                router_reason=decision.reason,
                 provider_error=None,
                 cognition_error=None,
                 runtime_name="orbe-cognition",
                 used_legacy_fallback=False,
                 knowledge_sources=knowledge_sources,
+                provider_attempts=[],
             )
         except Exception as exc:
             cognition_error = f"{type(exc).__name__}: {exc}"
             if not settings.cognition_fallback_to_legacy:
                 raise
 
-    provider_error: str | None = None
-    selected_provider_slug = decision.provider_slug if real_providers_enabled else "mock"
-
-    try:
-        result = execute_provider(
-            provider_slug=selected_provider_slug,
-            content=content,
-            mode=mode,
-            model_preference=model_preference,
-            memory_context=memory_context,
-            knowledge_context=knowledge_context,
-        )
-        router_reason = decision.reason
-
-        if not real_providers_enabled and decision.provider_slug != "mock":
-            router_reason = (
-                f"{decision.reason} Feature flag real_providers está desligada; "
-                "a execução foi desviada para orbe-mock."
-            )
-    except Exception as exc:
-        provider_error = f"{type(exc).__name__}: {exc}"
-        result = run_mock_provider(
-            content=content,
-            mode=mode,
-            model_preference=model_preference,
-            memory_context=memory_context,
-            knowledge_context=knowledge_context,
-        )
-        router_reason = (
-            f"{decision.reason} A execução legada falhou e o orbe-mock foi acionado. "
-            f"Erro: {provider_error}"
-        )
-
+    execution = execute_provider_plan(
+        _direct_plan(decision),
+        content=content,
+        mode=mode,
+        model_preference=model_preference,
+        memory_context=memory_context,
+        knowledge_context=knowledge_context,
+        real_providers_enabled=real_providers_enabled,
+    )
+    provider_error = _provider_error(execution)
+    router_reason = decision.reason
     if cognition_error:
         router_reason = (
-            f"orbe cognition falhou e o fallback legado foi acionado. "
-            f"Falha cognitiva: {cognition_error}. {router_reason}"
+            f"{decision.reason} O cognition falhou antes da resposta e o gateway direto "
+            "executou o plano de contingência."
         )
 
     return ChatRuntimeExecution(
-        result=result,
-        selected_provider_slug=selected_provider_slug,
+        result=execution.result,
+        selected_provider_slug=execution.selected_provider_slug,
         router_reason=router_reason,
         provider_error=provider_error,
         cognition_error=cognition_error,
-        runtime_name="legacy-provider",
+        runtime_name="direct-provider",
         used_legacy_fallback=bool(cognition_error),
         knowledge_sources=knowledge_sources,
+        provider_attempts=execution.attempts_payload(),
     )

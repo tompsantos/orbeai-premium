@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 import app.routers.chat_live as chat_live_module
 from app.main import app
+from app.services.provider_gateway import GatewayExecution, ProviderAttempt
 from app.services.providers.real import ProviderExecutionResult
 
 client = TestClient(app)
@@ -56,18 +57,18 @@ def test_live_fallback_uses_and_persists_selected_knowledge(monkeypatch) -> None
 
     captured: dict[str, str | None] = {}
 
-    def fake_execute_provider(
+    def fake_execute_provider_plan(
+        _plan: object,
         *,
-        provider_slug: str,
         content: str,
         mode: str,
         model_preference: str,
         memory_context: str | None = None,
         knowledge_context: str | None = None,
-    ) -> ProviderExecutionResult:
-        captured["provider_slug"] = provider_slug
+        real_providers_enabled: bool = True,
+    ) -> GatewayExecution:
         captured["knowledge_context"] = knowledge_context
-        return ProviderExecutionResult(
+        result = ProviderExecutionResult(
             content="fallback validado com conhecimento persistido",
             provider_name="orbe-test",
             model_name="orbe-test-model",
@@ -75,6 +76,20 @@ def test_live_fallback_uses_and_persists_selected_knowledge(monkeypatch) -> None
             output_tokens=7,
             latency_ms=1,
             estimated_cost_usd=0.0,
+        )
+        return GatewayExecution(
+            result=result,
+            attempts=(
+                ProviderAttempt(
+                    provider_slug="orbe-test",
+                    model_name="orbe-test-model",
+                    attempt=1,
+                    status="success",
+                    latency_ms=1,
+                ),
+            ),
+            selected_provider_slug="orbe-test",
+            used_fallback=False,
         )
 
     monkeypatch.setattr(
@@ -85,7 +100,11 @@ def test_live_fallback_uses_and_persists_selected_knowledge(monkeypatch) -> None
             cognition_fallback_to_legacy=True,
         ),
     )
-    monkeypatch.setattr(chat_live_module, "execute_provider", fake_execute_provider)
+    monkeypatch.setattr(
+        chat_live_module,
+        "execute_provider_plan",
+        fake_execute_provider_plan,
+    )
 
     with client.stream(
         "POST",
@@ -122,6 +141,7 @@ def test_live_fallback_uses_and_persists_selected_knowledge(monkeypatch) -> None
     assert assistant_meta["knowledge_context_count"] == 2
     assert {source["source_id"] for source in assistant_meta["knowledge_sources"]} == source_ids
     assert assistant_meta["feature_knowledge_context_enabled"] is True
+    assert assistant_meta["router_decision"]["route_kind"] == "knowledge"
 
     selection_logs = client.get(
         "/v1/audit-logs?action=knowledge.context.select&limit=300"

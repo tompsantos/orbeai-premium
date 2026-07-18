@@ -116,7 +116,9 @@ export function resolveRoute(opts: {
 export async function runWithFallback(decision: RouterDecision, req: AIRequest): Promise<AIResponse> {
   const seen = new Set<ProviderSlug>();
   const order: ProviderSlug[] = [decision.provider, ...decision.fallbackChain].filter((s) => {
-    if (seen.has(s)) return false; seen.add(s); return true;
+    if (seen.has(s)) { return false; }
+    seen.add(s);
+    return true;
   });
   let lastError: unknown;
   for (const slug of order) {

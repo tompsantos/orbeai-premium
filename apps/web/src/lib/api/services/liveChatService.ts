@@ -1,4 +1,4 @@
-import type { RouterDecision } from "@/lib/ai/router";
+import type { RouterDecision, TaskHint } from "@/lib/ai/router";
 import { apiClient } from "@/lib/api/client";
 import { chatService } from "@/lib/api/services/chatService";
 import type { ChatMode, Message, MessageRole, ModelKey, ProviderSlug } from "@/types";
@@ -67,10 +67,23 @@ export interface LiveChatEvent {
   description?: string;
   choices?: LiveApprovalChoice[];
   partialResponse?: string;
+  decision?: Record<string, unknown>;
   result?: LiveChatResult | null;
 }
 
 const MODEL_KEYS: ModelKey[] = ["auto", "gpt", "claude", "gemini", "qwen", "groq", "local"];
+const TASK_HINTS: TaskHint[] = [
+  "código",
+  "documento",
+  "pesquisa",
+  "estratégia",
+  "criatividade",
+  "risco",
+  "multimodal",
+  "ops",
+  "governo",
+  "vendas",
+];
 
 function toModelKey(value: string | null | undefined): ModelKey {
   if (!value) return "auto";
@@ -96,6 +109,27 @@ function toProviderSlug(value: string | null | undefined): ProviderSlug {
   return "mock";
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function toTaskHints(value: unknown): TaskHint[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(
+    (hint): hint is TaskHint => typeof hint === "string" && TASK_HINTS.includes(hint as TaskHint),
+  );
+}
+
+function toFallbackChain(value: unknown, actualProvider: ProviderSlug): ProviderSlug[] {
+  if (!Array.isArray(value)) return [actualProvider];
+  const chain = value
+    .filter((provider): provider is string => typeof provider === "string")
+    .map(toProviderSlug);
+  return chain.length ? chain : [actualProvider];
+}
+
 function toMessage(dto: BackendMessage): Message {
   const role: MessageRole =
     dto.role === "user" || dto.role === "assistant" || dto.role === "system"
@@ -119,21 +153,37 @@ function toMessage(dto: BackendMessage): Message {
 
 function normalizeResult(payload: BackendChatSendResponse): LiveChatResult {
   const provider = toProviderSlug(payload.provider);
+  const assistantMeta = payload.assistant_message.meta ?? {};
+  const routerDecision = asRecord(assistantMeta.router_decision);
+  const latencyMs = typeof assistantMeta.latency_ms === "number" ? assistantMeta.latency_ms : 0;
+  const estimatedLatencyMs = routerDecision?.estimated_latency_ms;
+  const estimatedCostUsd = routerDecision?.estimated_cost_usd;
+
   const decision: RouterDecision = {
     provider,
     model: payload.model,
-    reason: `Resposta entregue pelo runtime vivo ${payload.provider}/${payload.model}.`,
-    fallbackChain: [provider],
+    reason:
+      typeof routerDecision?.reason === "string"
+        ? routerDecision.reason
+        : `Resposta entregue pelo runtime vivo ${payload.provider}/${payload.model}.`,
+    fallbackChain: toFallbackChain(routerDecision?.fallback_chain, provider),
     routingMode: "automático",
-    estimatedLatencyMs: 0,
-    estimatedCostUsd: 0,
+    estimatedLatencyMs:
+      typeof estimatedLatencyMs === "number" ? estimatedLatencyMs : latencyMs,
+    estimatedCostUsd:
+      typeof estimatedCostUsd === "number" ? estimatedCostUsd : 0,
     qualityTier: payload.provider === "orbe-mock" ? "padrão" : "premium",
-    taskHints: [],
+    taskHints: toTaskHints(routerDecision?.task_hints),
     debugInfo: {
       modelRunId: payload.model_run_id,
       provider: payload.provider,
       model: payload.model,
+      latencyMs,
       source: "backend-live",
+      routerDecision,
+      providerAttempts: assistantMeta.provider_attempts,
+      estimatedCostAvailable: typeof estimatedCostUsd === "number",
+      estimatedLatencyAvailable: typeof estimatedLatencyMs === "number",
     },
   };
 
@@ -143,7 +193,7 @@ function normalizeResult(payload: BackendChatSendResponse): LiveChatResult {
       content: payload.assistant_message.content,
       provider,
       model: payload.model,
-      latencyMs: 0,
+      latencyMs,
     },
     userMessage: toMessage(payload.user_message),
     assistantMessage: {
@@ -186,6 +236,7 @@ function normalizeEvent(raw: Record<string, unknown>): LiveChatEvent {
       : undefined,
     partialResponse:
       typeof raw.partial_response === "string" ? raw.partial_response : undefined,
+    decision: asRecord(raw.decision) ?? undefined,
     result: response ? normalizeResult(response) : response === null ? null : undefined,
   };
 }
