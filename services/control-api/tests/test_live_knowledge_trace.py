@@ -1,5 +1,6 @@
 import json
 from types import SimpleNamespace
+from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
@@ -23,13 +24,15 @@ def _events(body: str) -> list[dict]:
 
 
 def test_live_fallback_uses_and_persists_selected_knowledge(monkeypatch) -> None:
+    token = f"pitanga{uuid4().hex}"
+
     report_response = client.post(
         "/v1/knowledge/reports",
         json={
-            "question": "Como funciona o protocolo pitanga orbital?",
+            "question": f"Como funciona o protocolo {token}?",
             "status": "concluído",
             "summary": (
-                "O protocolo pitanga orbital preserva a origem, limita o contexto "
+                f"O protocolo {token} preserva a origem, limita o contexto "
                 "e registra as fontes usadas no turno vivo."
             ),
         },
@@ -41,9 +44,9 @@ def test_live_fallback_uses_and_persists_selected_knowledge(monkeypatch) -> None
         "/v1/knowledge/materials",
         json={
             "report_id": report["id"],
-            "title": "Referência pitanga orbital",
+            "title": f"Referência {token}",
             "kind": "arquivo",
-            "excerpt": "Referência cadastrada para o protocolo pitanga orbital.",
+            "excerpt": f"Referência cadastrada para o protocolo {token}.",
             "confidence": 0.9,
             "meta": {"content_stored": False},
         },
@@ -88,7 +91,7 @@ def test_live_fallback_uses_and_persists_selected_knowledge(monkeypatch) -> None
         "POST",
         "/v1/chat/live",
         json={
-            "content": "Explique o protocolo pitanga orbital.",
+            "content": f"Explique o protocolo {token}.",
             "mode": "research",
             "model_preference": "auto",
         },
