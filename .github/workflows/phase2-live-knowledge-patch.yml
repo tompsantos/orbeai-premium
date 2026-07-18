@@ -1,9 +1,9 @@
 name: phase2-live-knowledge-patch
 
 on:
-  push:
+  pull_request:
     branches:
-      - agent/phase2-live-knowledge-trace
+      - main
 
 permissions:
   contents: write
