@@ -47,28 +47,25 @@ interface BackendModelRun {
 
 function toProviderSlug(value: string | null | undefined): ProviderSlug {
   const normalized = (value ?? "").toLowerCase();
-
   if (normalized.includes("openai") || normalized.includes("gpt")) return "openai";
   if (normalized.includes("anthropic") || normalized.includes("claude")) return "anthropic";
   if (normalized.includes("gemini")) return "gemini";
+  if (normalized.includes("nvidia") || normalized.includes("nim")) return "nvidia";
   if (normalized.includes("qwen")) return "qwen";
   if (normalized.includes("groq")) return "groq";
   if (normalized.includes("local")) return "local";
-
   return "mock";
 }
 
 function toStatus(value: string): ModelProvider["status"] {
   if (value === "online") return "online";
   if (value === "offline") return "offline";
-
   return "placeholder";
 }
 
 function toApiKeyStatus(value: string): ModelProvider["apiKeyStatus"] {
   if (value === "configurado") return "configurado";
   if (value === "ambiente") return "ambiente";
-
   return "não configurado";
 }
 
@@ -107,7 +104,6 @@ function toModelRun(dto: BackendModelRun): ModelRun {
 
 async function loadModelRuns(limit = 100): Promise<ModelRun[]> {
   if (apiClient.isMock) return [];
-
   const runs = await apiClient.request<BackendModelRun[]>(`/v1/model-runs?limit=${limit}`);
   return runs.map(toModelRun);
 }
@@ -115,11 +111,7 @@ async function loadModelRuns(limit = 100): Promise<ModelRun[]> {
 function summarizeRuns(runs: ModelRun[]): ProviderUsageSummary[] {
   const grouped = new Map<
     ProviderSlug,
-    {
-      summary: ProviderUsageSummary;
-      latencySum: number;
-      latencyCount: number;
-    }
+    { summary: ProviderUsageSummary; latencySum: number; latencyCount: number }
   >();
 
   for (const run of runs) {
@@ -137,25 +129,18 @@ function summarizeRuns(runs: ModelRun[]): ProviderUsageSummary[] {
       latencySum: 0,
       latencyCount: 0,
     };
-
     current.summary.requests += 1;
     current.summary.tokens += run.inputTokens + run.outputTokens;
     current.summary.costUsd += run.estimatedCostUsd;
-
-    if (run.errorMessage || run.status !== "success") {
-      current.summary.errors += 1;
-    }
-
+    if (run.errorMessage || run.status !== "success") current.summary.errors += 1;
     if (typeof run.latencyMs === "number") {
       current.latencySum += run.latencyMs;
       current.latencyCount += 1;
       current.summary.avgLatencyMs = Math.round(current.latencySum / current.latencyCount);
     }
-
     if (!current.summary.lastRunAt || run.createdAt > current.summary.lastRunAt) {
       current.summary.lastRunAt = run.createdAt;
     }
-
     grouped.set(run.provider, current);
   }
 
@@ -170,7 +155,6 @@ export const modelService = {
       const providers = await apiClient.request<BackendModelProvider[]>("/v1/model-providers");
       return providers.map(toModelProvider);
     }
-
     localStore.ensureSeeded();
     return localStore.get<ModelProvider[]>(STORAGE_KEYS.providers, mockProviders);
   },

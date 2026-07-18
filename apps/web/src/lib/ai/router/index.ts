@@ -26,19 +26,39 @@ const MODE_TO_PROVIDER: Record<ChatMode, ProviderSlug> = {
 };
 
 const MODEL_TO_PROVIDER: Record<Exclude<ModelKey, "auto">, ProviderSlug> = {
-  gpt: "openai", claude: "anthropic", gemini: "gemini",
+  gpt: "openai", claude: "anthropic", gemini: "gemini", nvidia: "mock",
   qwen: "qwen", groq: "groq", local: "local",
 };
 
 const PROVIDER_LATENCY: Record<ProviderSlug, number> = {
-  openai: 1400, anthropic: 1600, gemini: 1300, qwen: 1100, groq: 380, local: 900, mock: 720,
+  openai: 1400,
+  anthropic: 1600,
+  gemini: 1300,
+  nvidia: 1200,
+  qwen: 1100,
+  groq: 380,
+  local: 900,
+  mock: 720,
 };
 const PROVIDER_COST: Record<ProviderSlug, number> = {
-  openai: 0.005, anthropic: 0.006, gemini: 0.004, qwen: 0.002, groq: 0.0005, local: 0, mock: 0,
+  openai: 0.005,
+  anthropic: 0.006,
+  gemini: 0.004,
+  nvidia: 0,
+  qwen: 0.002,
+  groq: 0.0005,
+  local: 0,
+  mock: 0,
 };
 const PROVIDER_QUALITY: Record<ProviderSlug, QualityTier> = {
-  openai: "premium", anthropic: "flagship", gemini: "premium",
-  qwen: "padrão", groq: "essencial", local: "essencial", mock: "padrão",
+  openai: "premium",
+  anthropic: "flagship",
+  gemini: "premium",
+  nvidia: "premium",
+  qwen: "padrão",
+  groq: "essencial",
+  local: "essencial",
+  mock: "padrão",
 };
 
 const HINT_PATTERNS: Array<{ hint: TaskHint; regex: RegExp }> = [
@@ -56,12 +76,18 @@ const HINT_PATTERNS: Array<{ hint: TaskHint; regex: RegExp }> = [
 
 function detectHints(prompt?: string): TaskHint[] {
   if (!prompt) return [];
-  return HINT_PATTERNS.filter((p) => p.regex.test(prompt)).map((p) => p.hint);
+  return HINT_PATTERNS.filter((pattern) => pattern.regex.test(prompt)).map((pattern) => pattern.hint);
 }
 
 function buildFallback(primary: ProviderSlug): ProviderSlug[] {
   const order: ProviderSlug[] = ["anthropic", "openai", "gemini", "groq", "mock"];
-  return order.filter((p) => p !== primary);
+  return order.filter((provider) => provider !== primary);
+}
+
+function clientProvider(provider: ProviderSlug) {
+  return provider in providersBySlug
+    ? providersBySlug[provider as keyof typeof providersBySlug]
+    : providersBySlug.mock;
 }
 
 export function resolveRoute(opts: {
@@ -79,21 +105,30 @@ export function resolveRoute(opts: {
 
   if (model && model !== "auto") {
     provider = MODEL_TO_PROVIDER[model];
-    reason = `Modelo selecionado manualmente (${model})`;
+    reason = model === "nvidia"
+      ? "NVIDIA exige backend conectado; prévia segura usa mock"
+      : `Modelo selecionado manualmente (${model})`;
   } else if (routingMode === "menor custo") {
-    provider = "groq"; reason = "Política de menor custo";
+    provider = "groq";
+    reason = "Política de menor custo";
   } else if (routingMode === "mais rápido") {
-    provider = "groq"; reason = "Política de menor latência";
+    provider = "groq";
+    reason = "Política de menor latência";
   } else if (routingMode === "raciocínio profundo" || routingMode === "melhor qualidade") {
-    provider = "anthropic"; reason = "Raciocínio profundo / qualidade máxima";
+    provider = "anthropic";
+    reason = "Raciocínio profundo / qualidade máxima";
   } else if (hints.includes("código")) {
-    provider = "anthropic"; reason = "Sinal de código no prompt → claude";
+    provider = "anthropic";
+    reason = "Sinal de código no prompt → claude";
   } else if (hints.includes("pesquisa")) {
-    provider = "gemini"; reason = "Sinal de pesquisa → gemini";
+    provider = "gemini";
+    reason = "Sinal de pesquisa → gemini";
   } else if (hints.includes("documento") || hints.includes("governo")) {
-    provider = "openai"; reason = "Documento/edital → gpt";
+    provider = "openai";
+    reason = "Documento/edital → gpt";
   } else if (hints.includes("ops") || hints.includes("vendas")) {
-    provider = "groq"; reason = "Operação/comercial → latência baixa";
+    provider = "groq";
+    reason = "Operação/comercial → latência baixa";
   } else if (mode) {
     provider = MODE_TO_PROVIDER[mode];
     reason = `Modo orbe ${mode} → provedor ideal`;
@@ -101,7 +136,7 @@ export function resolveRoute(opts: {
 
   return {
     provider,
-    model: providersBySlug[provider].slug,
+    model: clientProvider(provider).slug,
     reason,
     fallbackChain: buildFallback(provider),
     routingMode: effectiveRouting,
@@ -115,17 +150,23 @@ export function resolveRoute(opts: {
 
 export async function runWithFallback(decision: RouterDecision, req: AIRequest): Promise<AIResponse> {
   const seen = new Set<ProviderSlug>();
-  const order: ProviderSlug[] = [decision.provider, ...decision.fallbackChain].filter((s) => {
-    if (seen.has(s)) { return false; }
-    seen.add(s);
-    return true;
+  const order: ProviderSlug[] = [decision.provider, ...decision.fallbackChain].filter((slug) => {
+    if (seen.has(slug)) return false;
+    seen.add(slug);
+    return slug in providersBySlug;
   });
   let lastError: unknown;
   for (const slug of order) {
-    const p = providersBySlug[slug];
-    if (!p.isConfigured()) { lastError = new Error(`${slug} não configurado`); continue; }
-    try { return await p.complete(req); }
-    catch (e) { lastError = e; continue; }
+    const provider = clientProvider(slug);
+    if (!provider.isConfigured()) {
+      lastError = new Error(`${slug} não configurado`);
+      continue;
+    }
+    try {
+      return await provider.complete(req);
+    } catch (error) {
+      lastError = error;
+    }
   }
   throw lastError ?? new Error("Nenhum provedor disponível");
 }

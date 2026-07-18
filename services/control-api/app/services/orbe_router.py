@@ -72,60 +72,56 @@ class CapabilityDefinition:
 
 CAPABILITY_REGISTRY: dict[str, CapabilityDefinition] = {
     "direct_text_response": CapabilityDefinition(
-        capability_id="direct_text_response",
-        route_kind=RouteKind.DIRECT_MODEL,
-        implemented=True,
-        execution_strategy=ExecutionStrategy.DIRECT_PROVIDER,
-        description="resposta textual direta por provider registrado",
+        "direct_text_response",
+        RouteKind.DIRECT_MODEL,
+        True,
+        ExecutionStrategy.DIRECT_PROVIDER,
+        "resposta textual direta por provider registrado",
     ),
     "external_memory_context": CapabilityDefinition(
-        capability_id="external_memory_context",
-        route_kind=RouteKind.MEMORY,
-        implemented=True,
-        execution_strategy=ExecutionStrategy.DIRECT_PROVIDER,
-        description="contexto de memória autorizado pelo control-api",
+        "external_memory_context",
+        RouteKind.MEMORY,
+        True,
+        ExecutionStrategy.DIRECT_PROVIDER,
+        "contexto de memória autorizado pelo control-api",
     ),
     "external_knowledge_context": CapabilityDefinition(
-        capability_id="external_knowledge_context",
-        route_kind=RouteKind.KNOWLEDGE,
-        implemented=True,
-        execution_strategy=ExecutionStrategy.DIRECT_PROVIDER,
-        description="conhecimento persistido selecionado pelo control-api",
+        "external_knowledge_context",
+        RouteKind.KNOWLEDGE,
+        True,
+        ExecutionStrategy.DIRECT_PROVIDER,
+        "conhecimento persistido selecionado pelo control-api",
     ),
     "cognitive_loop": CapabilityDefinition(
-        capability_id="cognitive_loop",
-        route_kind=RouteKind.COGNITION,
-        implemented=True,
-        execution_strategy=ExecutionStrategy.COGNITION,
-        description="loop cognitivo interno executado pelo orbe cognition core",
+        "cognitive_loop",
+        RouteKind.COGNITION,
+        True,
+        ExecutionStrategy.COGNITION,
+        "loop cognitivo interno executado pelo orbe cognition core",
     ),
     "tool_execution": CapabilityDefinition(
-        capability_id="tool_execution",
-        route_kind=RouteKind.TOOL,
-        implemented=False,
-        execution_strategy=ExecutionStrategy.COGNITION,
-        description="execução de ferramentas autorizadas por política",
+        "tool_execution",
+        RouteKind.TOOL,
+        False,
+        ExecutionStrategy.COGNITION,
+        "execução de ferramentas autorizadas por política",
     ),
     "durable_mission": CapabilityDefinition(
-        capability_id="durable_mission",
-        route_kind=RouteKind.MISSION,
-        implemented=False,
-        execution_strategy=None,
-        description="missão longa e durável",
+        "durable_mission", RouteKind.MISSION, False, None, "missão longa e durável"
     ),
     "monitoring_watch": CapabilityDefinition(
-        capability_id="monitoring_watch",
-        route_kind=RouteKind.MONITORING,
-        implemented=False,
-        execution_strategy=None,
-        description="monitoramento recorrente orientado por condição",
+        "monitoring_watch",
+        RouteKind.MONITORING,
+        False,
+        None,
+        "monitoramento recorrente orientado por condição",
     ),
     "model_council": CapabilityDefinition(
-        capability_id="model_council",
-        route_kind=RouteKind.COUNCIL,
-        implemented=False,
-        execution_strategy=None,
-        description="conselho e avaliação comparativa de modelos",
+        "model_council",
+        RouteKind.COUNCIL,
+        False,
+        None,
+        "conselho e avaliação comparativa de modelos",
     ),
 }
 
@@ -140,6 +136,7 @@ class RouterRequest:
     knowledge_context_count: int = 0
     cognition_enabled: bool = True
     real_providers_enabled: bool = True
+    workspace_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -256,7 +253,6 @@ HINT_PATTERNS = [
     ("governo", re.compile(r"\b(licita\w+|edital|termo de refer[êe]ncia|setor p[úu]blico)\b", re.I)),
     ("vendas", re.compile(r"\b(vendas|lead|pipeline|proposta|comercial|prospec\w+)\b", re.I)),
 ]
-
 TOOL_PATTERN = re.compile(
     r"\b(execut[ae]|rode|abra|edite|crie (?:um )?arquivo|use (?:uma )?ferramenta|"
     r"terminal|github|pull request|commit|deploy|navegador|pesquise na (?:web|internet))\b",
@@ -267,11 +263,12 @@ MULTI_STEP_PATTERN = re.compile(
     r"analise e corrija|crie e publique)\b",
     re.I,
 )
-
 MODEL_TO_PROVIDER = {
     "gpt": "openai",
     "openai": "openai",
     "gemini": "gemini",
+    "nvidia": "nvidia",
+    "nim": "nvidia",
     "mock": "mock",
 }
 
@@ -284,7 +281,6 @@ def classify_request(request: RouterRequest) -> SemanticClassification:
     hints = tuple(detect_task_hints(request.content))
     requires_tools = bool(TOOL_PATTERN.search(request.content))
     multi_step = bool(MULTI_STEP_PATTERN.search(request.content))
-
     if requires_tools or len(request.content) > 2_500:
         complexity = "high"
     elif multi_step or len(request.content) > 900 or len(hints) >= 3:
@@ -305,8 +301,11 @@ def classify_request(request: RouterRequest) -> SemanticClassification:
 
     domain = next(iter(hints), "general")
     risk = "elevated" if "risco" in hints or "governo" in hints else "normal"
-    sensitivity = "sensitive" if re.search(r"\b(senha|segredo|token|chave privada|sa[úu]de)\b", request.content, re.I) else "normal"
-
+    sensitivity = (
+        "sensitive"
+        if re.search(r"\b(senha|segredo|token|chave privada|sa[úu]de)\b", request.content, re.I)
+        else "normal"
+    )
     return SemanticClassification(
         intent=intent,
         domain=domain,
@@ -335,12 +334,7 @@ def _provider_preference(
 
     route_mode = request.routing_mode.strip().lower()
     if route_mode in {"menor custo", "custo", "mais rápido", "rapidez", "latência"}:
-        return (
-            "gemini",
-            ReasonCode.ROUTING_POLICY,
-            f"política operacional configurada: {request.routing_mode}",
-        )
-
+        return "gemini", ReasonCode.ROUTING_POLICY, f"política operacional: {request.routing_mode}"
     if "pesquisa" in classification.task_hints:
         return "gemini", ReasonCode.SEMANTIC_RESEARCH, "sinal semântico de pesquisa"
     if "documento" in classification.task_hints or "governo" in classification.task_hints:
@@ -382,13 +376,11 @@ def _build_decision(
     registry: ProviderRegistry,
 ) -> RouterDecision:
     primary_provider, provider_reason_code, provider_reason = _provider_preference(
-        request,
-        classification,
+        request, classification
     )
     direct_capabilities = ["direct_text_response"]
     route_kind = RouteKind.DIRECT_MODEL
-    reason_codes: list[str] = [provider_reason_code.value]
-
+    reason_codes = [provider_reason_code.value]
     if request.memory_context_count:
         direct_capabilities.append("external_memory_context")
         route_kind = RouteKind.MEMORY
@@ -425,38 +417,38 @@ def _build_decision(
             allow_mock=True,
             implemented=True,
         )
+        primary = registry.get(primary_provider)
         return RouterDecision(
-            router_version="orbe-router-v1",
-            route_kind=RouteKind.COGNITION,
-            execution_strategy=ExecutionStrategy.COGNITION,
-            provider_slug="orbe-cognition",
-            provider_name="orbe cognition core",
-            model_name="orbe-cognition-default",
-            primary_provider_slug=primary_provider,
-            primary_model_name=registry.get(primary_provider).model_name,
-            reason=(
+            "orbe-router-v1",
+            RouteKind.COGNITION,
+            ExecutionStrategy.COGNITION,
+            "orbe-cognition",
+            "orbe cognition core",
+            "orbe-cognition-default",
+            primary_provider,
+            primary.model_name,
+            (
                 "orbeRouter escolheu execução cognitiva porque a solicitação exige "
                 f"coordenação adicional; fallback direto prioriza {primary_provider} por {provider_reason}."
             ),
-            reason_codes=tuple(reason_codes),
-            fallback_chain=list(plan.provider_chain),
-            routing_mode=request.routing_mode,
-            estimated_latency_ms=None,
-            estimated_cost_usd=None,
-            quality_tier="runtime-selected",
-            task_hints=list(classification.task_hints),
-            capability_ids=plan.capability_ids,
-            primary_configured=registry.get(primary_provider).executable,
-            selected_configured=True,
-            is_fallback=False,
-            implemented=True,
-            classification=classification,
-            execution_plan=plan,
+            tuple(reason_codes),
+            list(plan.provider_chain),
+            request.routing_mode,
+            None,
+            None,
+            "runtime-selected",
+            list(classification.task_hints),
+            plan.capability_ids,
+            primary.executable,
+            True,
+            False,
+            True,
+            classification,
+            plan,
         )
 
     if wants_cognition:
         reason_codes.append(ReasonCode.COGNITION_UNAVAILABLE.value)
-
     plan = _direct_plan(
         primary_provider=primary_provider,
         registry=registry,
@@ -464,49 +456,44 @@ def _build_decision(
         route_kind=route_kind,
         capability_ids=tuple(direct_capabilities),
     )
-    selected_provider = next(
-        registry.get(slug) for slug in plan.provider_chain if registry.get(slug).executable
-    )
+    selected = next(registry.get(slug) for slug in plan.provider_chain if registry.get(slug).executable)
     primary = registry.get(primary_provider)
-    is_fallback = selected_provider.provider_slug != primary_provider
-    if is_fallback:
-        reason_codes.append(ReasonCode.PROVIDER_FALLBACK.value)
-    if selected_provider.provider_slug == "mock":
+    is_fallback = selected.provider_slug != primary_provider
+    reason_codes.append(
+        ReasonCode.PROVIDER_FALLBACK.value if is_fallback else ReasonCode.PROVIDER_CONFIGURED.value
+    )
+    if selected.provider_slug == "mock":
         reason_codes.append(ReasonCode.MOCK_ONLY.value)
-    else:
-        reason_codes.append(ReasonCode.PROVIDER_CONFIGURED.value)
-
     reason = f"orbeRouter escolheu {primary_provider} por {provider_reason}."
     if is_fallback:
         reason += (
             f" O provider primário está {primary.state.value}; o plano inicia em "
-            f"{selected_provider.provider_slug} como fallback explícito."
+            f"{selected.provider_slug} como fallback explícito."
         )
-
     return RouterDecision(
-        router_version="orbe-router-v1",
-        route_kind=route_kind,
-        execution_strategy=ExecutionStrategy.DIRECT_PROVIDER,
-        provider_slug=selected_provider.provider_slug,
-        provider_name=selected_provider.provider_name,
-        model_name=selected_provider.model_name,
-        primary_provider_slug=primary_provider,
-        primary_model_name=primary.model_name,
-        reason=reason,
-        reason_codes=tuple(reason_codes),
-        fallback_chain=list(plan.provider_chain),
-        routing_mode=request.routing_mode,
-        estimated_latency_ms=None,
-        estimated_cost_usd=None,
-        quality_tier="configured" if selected_provider.is_real else "mock",
-        task_hints=list(classification.task_hints),
-        capability_ids=plan.capability_ids,
-        primary_configured=primary.executable,
-        selected_configured=selected_provider.executable,
-        is_fallback=is_fallback,
-        implemented=True,
-        classification=classification,
-        execution_plan=plan,
+        "orbe-router-v1",
+        route_kind,
+        ExecutionStrategy.DIRECT_PROVIDER,
+        selected.provider_slug,
+        selected.provider_name,
+        selected.model_name,
+        primary_provider,
+        primary.model_name,
+        reason,
+        tuple(reason_codes),
+        list(plan.provider_chain),
+        request.routing_mode,
+        None,
+        None,
+        "configured" if selected.is_real else "mock",
+        list(classification.task_hints),
+        plan.capability_ids,
+        primary.executable,
+        selected.executable,
+        is_fallback,
+        True,
+        classification,
+        plan,
     )
 
 
@@ -520,6 +507,7 @@ def resolve_chat_route(
     knowledge_context_count: int = 0,
     cognition_enabled: bool | None = None,
     real_providers_enabled: bool = True,
+    workspace_id: str | None = None,
 ) -> RouterDecision:
     settings = get_settings()
     request = RouterRequest(
@@ -531,10 +519,12 @@ def resolve_chat_route(
         knowledge_context_count=knowledge_context_count,
         cognition_enabled=(settings.cognition_enabled if cognition_enabled is None else cognition_enabled),
         real_providers_enabled=real_providers_enabled,
+        workspace_id=workspace_id,
     )
     registry = build_provider_registry(
         settings,
         real_providers_enabled=real_providers_enabled,
+        workspace_id=workspace_id,
     )
     return _build_decision(request, classify_request(request), settings, registry)
 
@@ -547,6 +537,7 @@ def resolve_legacy_chat_route(
     *,
     cognition_enabled: bool | None = None,
     real_providers_enabled: bool = True,
+    workspace_id: str | None = None,
 ) -> RouterDecision:
     decision = resolve_chat_route(
         content=content,
@@ -555,6 +546,7 @@ def resolve_legacy_chat_route(
         routing_mode=routing_mode,
         cognition_enabled=cognition_enabled,
         real_providers_enabled=real_providers_enabled,
+        workspace_id=workspace_id,
     )
     return RouterDecision(
         **{

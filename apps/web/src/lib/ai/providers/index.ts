@@ -34,6 +34,7 @@ function placeholder(slug: ProviderSlug, model: string): BaseAIProvider {
 export const OpenAIProvider = placeholder("openai", "gpt-5.2");
 export const AnthropicProvider = placeholder("anthropic", "claude-sonnet-4.5");
 export const GeminiProvider = placeholder("gemini", "gemini-3-pro");
+export const NvidiaProvider = placeholder("nvidia", "nvidia/nemotron-3-super-120b-a12b");
 export const QwenProvider = placeholder("qwen", "qwen3-max");
 export const GroqProvider = placeholder("groq", "llama-3.3-70b");
 export const LocalProvider = placeholder("local", "llama-cpp");
@@ -78,6 +79,7 @@ export const providersBySlug: Record<ProviderSlug, BaseAIProvider> = {
   openai: OpenAIProvider,
   anthropic: AnthropicProvider,
   gemini: GeminiProvider,
+  nvidia: NvidiaProvider,
   qwen: QwenProvider,
   groq: GroqProvider,
   local: LocalProvider,

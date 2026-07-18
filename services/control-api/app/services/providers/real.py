@@ -1,7 +1,13 @@
 from dataclasses import dataclass
+from os import getenv
 from time import perf_counter
 
 from app.core.config import get_settings
+from app.services.provider_credentials import (
+    ResolvedProviderCredential,
+    provider_definition,
+    resolve_provider_credential,
+)
 from app.services.providers.mock import (
     MOCK_MODEL_NAME,
     MOCK_PROVIDER_NAME,
@@ -60,20 +66,59 @@ def build_prompt(
     )
 
 
+def _environment_price(name: str) -> float:
+    raw = getenv(name)
+    if not raw:
+        return 0.0
+    try:
+        return float(raw)
+    except ValueError:
+        return 0.0
+
+
 def estimate_provider_cost(provider_slug: str, input_tokens: int, output_tokens: int) -> float:
     settings = get_settings()
 
     if provider_slug == "openai":
-        input_cost = (input_tokens / 1_000_000) * settings.openai_input_price_per_m_tokens
-        output_cost = (output_tokens / 1_000_000) * settings.openai_output_price_per_m_tokens
-        return round(input_cost + output_cost, 8)
+        input_price = settings.openai_input_price_per_m_tokens
+        output_price = settings.openai_output_price_per_m_tokens
+    elif provider_slug == "gemini":
+        input_price = settings.gemini_input_price_per_m_tokens
+        output_price = settings.gemini_output_price_per_m_tokens
+    elif provider_slug == "nvidia":
+        input_price = _environment_price("NVIDIA_INPUT_PRICE_PER_M_TOKENS")
+        output_price = _environment_price("NVIDIA_OUTPUT_PRICE_PER_M_TOKENS")
+    else:
+        return 0.0
 
-    if provider_slug == "gemini":
-        input_cost = (input_tokens / 1_000_000) * settings.gemini_input_price_per_m_tokens
-        output_cost = (output_tokens / 1_000_000) * settings.gemini_output_price_per_m_tokens
-        return round(input_cost + output_cost, 8)
+    input_cost = (input_tokens / 1_000_000) * input_price
+    output_cost = (output_tokens / 1_000_000) * output_price
+    return round(input_cost + output_cost, 8)
 
-    return 0.0
+
+def _resolve_execution_credential(
+    provider_slug: str,
+    *,
+    workspace_id: str | None,
+    api_key_override: str | None,
+    model_name_override: str | None,
+    base_url_override: str | None,
+) -> ResolvedProviderCredential:
+    definition = provider_definition(provider_slug)
+    if api_key_override:
+        return ResolvedProviderCredential(
+            provider_slug=provider_slug,
+            api_key=api_key_override,
+            model_name=model_name_override or definition.default_model,
+            base_url=base_url_override or definition.base_url,
+            source="request_override",
+            key_hint="••••",
+        )
+
+    credential = resolve_provider_credential(workspace_id, provider_slug)
+    if credential is None:
+        raise RuntimeError(f"credencial de {provider_slug} não configurada")
+    return credential
 
 
 def run_mock_provider(
@@ -110,14 +155,22 @@ def run_openai_provider(
     model_preference: str,
     memory_context: str | None = None,
     knowledge_context: str | None = None,
+    *,
+    workspace_id: str | None = None,
+    api_key_override: str | None = None,
+    model_name_override: str | None = None,
+    base_url_override: str | None = None,
 ) -> ProviderExecutionResult:
     from openai import OpenAI
 
     settings = get_settings()
-
-    if not settings.openai_api_key:
-        raise RuntimeError("OPENAI_API_KEY não configurada.")
-
+    credential = _resolve_execution_credential(
+        "openai",
+        workspace_id=workspace_id,
+        api_key_override=api_key_override,
+        model_name_override=model_name_override,
+        base_url_override=base_url_override,
+    )
     started_at = perf_counter()
     prompt = build_prompt(
         content=content,
@@ -128,11 +181,11 @@ def run_openai_provider(
     )
 
     client = OpenAI(
-        api_key=settings.openai_api_key,
+        api_key=credential.api_key,
         timeout=settings.provider_timeout_seconds,
     )
     response = client.responses.create(
-        model=settings.openai_model,
+        model=credential.model_name,
         input=prompt,
     )
 
@@ -146,7 +199,7 @@ def run_openai_provider(
     return ProviderExecutionResult(
         content=output_text,
         provider_name="openai",
-        model_name=settings.openai_model,
+        model_name=credential.model_name,
         input_tokens=final_input_tokens,
         output_tokens=final_output_tokens,
         latency_ms=int((perf_counter() - started_at) * 1000),
@@ -164,14 +217,22 @@ def run_gemini_provider(
     model_preference: str,
     memory_context: str | None = None,
     knowledge_context: str | None = None,
+    *,
+    workspace_id: str | None = None,
+    api_key_override: str | None = None,
+    model_name_override: str | None = None,
+    base_url_override: str | None = None,
 ) -> ProviderExecutionResult:
     from google import genai
 
     settings = get_settings()
-
-    if not settings.gemini_api_key:
-        raise RuntimeError("GEMINI_API_KEY não configurada.")
-
+    credential = _resolve_execution_credential(
+        "gemini",
+        workspace_id=workspace_id,
+        api_key_override=api_key_override,
+        model_name_override=model_name_override,
+        base_url_override=base_url_override,
+    )
     started_at = perf_counter()
     prompt = build_prompt(
         content=content,
@@ -182,11 +243,11 @@ def run_gemini_provider(
     )
 
     client = genai.Client(
-        api_key=settings.gemini_api_key,
+        api_key=credential.api_key,
         http_options={"timeout": int(settings.provider_timeout_seconds * 1_000)},
     )
     interaction = client.interactions.create(
-        model=settings.gemini_model,
+        model=credential.model_name,
         input=prompt,
     )
 
@@ -197,7 +258,7 @@ def run_gemini_provider(
     return ProviderExecutionResult(
         content=output_text,
         provider_name="gemini",
-        model_name=settings.gemini_model,
+        model_name=credential.model_name,
         input_tokens=input_tokens,
         output_tokens=output_tokens,
         latency_ms=int((perf_counter() - started_at) * 1000),
@@ -209,6 +270,72 @@ def run_gemini_provider(
     )
 
 
+def run_nvidia_provider(
+    content: str,
+    mode: str,
+    model_preference: str,
+    memory_context: str | None = None,
+    knowledge_context: str | None = None,
+    *,
+    workspace_id: str | None = None,
+    api_key_override: str | None = None,
+    model_name_override: str | None = None,
+    base_url_override: str | None = None,
+) -> ProviderExecutionResult:
+    from openai import OpenAI
+
+    settings = get_settings()
+    credential = _resolve_execution_credential(
+        "nvidia",
+        workspace_id=workspace_id,
+        api_key_override=api_key_override,
+        model_name_override=model_name_override,
+        base_url_override=base_url_override,
+    )
+    started_at = perf_counter()
+    prompt = build_prompt(
+        content=content,
+        mode=mode,
+        model_preference=model_preference,
+        memory_context=memory_context,
+        knowledge_context=knowledge_context,
+    )
+
+    client = OpenAI(
+        api_key=credential.api_key,
+        base_url=credential.base_url,
+        timeout=settings.provider_timeout_seconds,
+    )
+    response = client.chat.completions.create(
+        model=credential.model_name,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.2,
+        max_tokens=2048,
+        stream=False,
+    )
+    message = response.choices[0].message
+    output_text = message.content or ""
+    usage = getattr(response, "usage", None)
+    input_tokens = getattr(usage, "prompt_tokens", None) if usage else None
+    output_tokens = getattr(usage, "completion_tokens", None) if usage else None
+    final_input_tokens = input_tokens or estimate_tokens(prompt)
+    final_output_tokens = output_tokens or estimate_tokens(output_text)
+
+    return ProviderExecutionResult(
+        content=output_text,
+        provider_name="nvidia",
+        model_name=credential.model_name,
+        input_tokens=final_input_tokens,
+        output_tokens=final_output_tokens,
+        latency_ms=int((perf_counter() - started_at) * 1000),
+        estimated_cost_usd=estimate_provider_cost(
+            provider_slug="nvidia",
+            input_tokens=final_input_tokens,
+            output_tokens=final_output_tokens,
+        ),
+    )
+
+
 def execute_provider(
     provider_slug: str,
     content: str,
@@ -216,25 +343,29 @@ def execute_provider(
     model_preference: str,
     memory_context: str | None = None,
     knowledge_context: str | None = None,
+    *,
+    workspace_id: str | None = None,
+    api_key_override: str | None = None,
+    model_name_override: str | None = None,
+    base_url_override: str | None = None,
 ) -> ProviderExecutionResult:
+    kwargs = {
+        "content": content,
+        "mode": mode,
+        "model_preference": model_preference,
+        "memory_context": memory_context,
+        "knowledge_context": knowledge_context,
+        "workspace_id": workspace_id,
+        "api_key_override": api_key_override,
+        "model_name_override": model_name_override,
+        "base_url_override": base_url_override,
+    }
     if provider_slug == "openai":
-        return run_openai_provider(
-            content=content,
-            mode=mode,
-            model_preference=model_preference,
-            memory_context=memory_context,
-            knowledge_context=knowledge_context,
-        )
-
+        return run_openai_provider(**kwargs)
     if provider_slug == "gemini":
-        return run_gemini_provider(
-            content=content,
-            mode=mode,
-            model_preference=model_preference,
-            memory_context=memory_context,
-            knowledge_context=knowledge_context,
-        )
-
+        return run_gemini_provider(**kwargs)
+    if provider_slug == "nvidia":
+        return run_nvidia_provider(**kwargs)
     if provider_slug == "mock":
         return run_mock_provider(
             content=content,
@@ -243,5 +374,4 @@ def execute_provider(
             memory_context=memory_context,
             knowledge_context=knowledge_context,
         )
-
     raise ValueError(f"provider sem adapter direto registrado: {provider_slug}")

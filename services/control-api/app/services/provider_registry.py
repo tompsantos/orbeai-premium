@@ -4,6 +4,13 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from app.core.config import Settings, get_settings
+from app.db.session import SessionLocal
+from app.services.bootstrap import get_or_create_default_workspace
+from app.services.provider_credentials import (
+    CredentialDecryptionError,
+    provider_definition,
+    resolve_provider_credential,
+)
 from app.services.providers.mock import MOCK_MODEL_NAME, MOCK_PROVIDER_NAME
 
 
@@ -23,6 +30,8 @@ class ProviderModel:
     state_reason: str
     capabilities: tuple[str, ...]
     is_real: bool
+    credential_source: str | None = None
+    key_hint: str | None = None
 
     @property
     def executable(self) -> bool:
@@ -38,6 +47,8 @@ class ProviderModel:
             "capabilities": list(self.capabilities),
             "is_real": self.is_real,
             "executable": self.executable,
+            "credential_source": self.credential_source,
+            "key_hint": self.key_hint,
         }
 
 
@@ -57,7 +68,7 @@ class ProviderRegistry:
         *,
         include_mock: bool = True,
     ) -> list[str]:
-        ordered = [primary_provider_slug, "openai", "gemini"]
+        ordered = [primary_provider_slug, "openai", "gemini", "nvidia"]
         if include_mock:
             ordered.append("mock")
 
@@ -71,58 +82,105 @@ class ProviderRegistry:
         return [provider.persisted_payload() for provider in self.providers.values()]
 
 
+def resolve_registry_workspace_id(workspace_id: str | None) -> str | None:
+    if workspace_id:
+        return workspace_id
+    try:
+        with SessionLocal() as db:
+            return get_or_create_default_workspace(db).id
+    except Exception:
+        return None
+
+
 def _real_provider_state(
     *,
     globally_enabled: bool,
     workspace_enabled: bool,
     has_credential: bool,
+    credential_source: str | None,
 ) -> tuple[ProviderState, str]:
-    if not globally_enabled:
-        return ProviderState.DISABLED, "real_providers_globally_disabled"
     if not workspace_enabled:
         return ProviderState.DISABLED, "real_providers_workspace_disabled"
     if not has_credential:
         return ProviderState.UNAVAILABLE, "credential_missing"
-    return ProviderState.CONFIGURED, "configured"
+    if credential_source == "workspace_vault":
+        return ProviderState.CONFIGURED, "workspace_vault_configured"
+    if not globally_enabled:
+        return ProviderState.DISABLED, "environment_providers_globally_disabled"
+    return ProviderState.CONFIGURED, "environment_configured"
+
+
+def _registered_real_provider(
+    provider_slug: str,
+    *,
+    settings: Settings,
+    workspace_id: str | None,
+    real_providers_enabled: bool,
+) -> ProviderModel:
+    definition = provider_definition(provider_slug, settings)
+    credential = None
+    decryption_failed = False
+    try:
+        credential = resolve_provider_credential(
+            workspace_id,
+            provider_slug,
+            settings=settings,
+        )
+    except CredentialDecryptionError:
+        decryption_failed = True
+
+    source = credential.source if credential is not None else None
+    state, reason = _real_provider_state(
+        globally_enabled=settings.enable_real_providers,
+        workspace_enabled=real_providers_enabled,
+        has_credential=credential is not None,
+        credential_source=source,
+    )
+    if decryption_failed:
+        state = ProviderState.UNAVAILABLE
+        reason = "credential_unreadable"
+
+    return ProviderModel(
+        provider_slug=provider_slug,
+        provider_name=definition.display_name,
+        model_name=credential.model_name if credential is not None else definition.default_model,
+        state=state,
+        state_reason=reason,
+        capabilities=("text_chat", "direct_execution", "stream_emulation"),
+        is_real=True,
+        credential_source=source,
+        key_hint=credential.key_hint if credential is not None else None,
+    )
 
 
 def build_provider_registry(
     settings: Settings | None = None,
     *,
     real_providers_enabled: bool = True,
+    workspace_id: str | None = None,
 ) -> ProviderRegistry:
     settings = settings or get_settings()
-
-    openai_state, openai_reason = _real_provider_state(
-        globally_enabled=settings.enable_real_providers,
-        workspace_enabled=real_providers_enabled,
-        has_credential=bool(settings.openai_api_key),
-    )
-    gemini_state, gemini_reason = _real_provider_state(
-        globally_enabled=settings.enable_real_providers,
-        workspace_enabled=real_providers_enabled,
-        has_credential=bool(settings.gemini_api_key),
-    )
+    workspace_id = resolve_registry_workspace_id(workspace_id)
 
     return ProviderRegistry(
         providers={
-            "openai": ProviderModel(
-                provider_slug="openai",
-                provider_name="OpenAI",
-                model_name=settings.openai_model,
-                state=openai_state,
-                state_reason=openai_reason,
-                capabilities=("text_chat", "direct_execution", "stream_emulation"),
-                is_real=True,
+            "openai": _registered_real_provider(
+                "openai",
+                settings=settings,
+                workspace_id=workspace_id,
+                real_providers_enabled=real_providers_enabled,
             ),
-            "gemini": ProviderModel(
-                provider_slug="gemini",
-                provider_name="Google Gemini",
-                model_name=settings.gemini_model,
-                state=gemini_state,
-                state_reason=gemini_reason,
-                capabilities=("text_chat", "direct_execution", "stream_emulation"),
-                is_real=True,
+            "gemini": _registered_real_provider(
+                "gemini",
+                settings=settings,
+                workspace_id=workspace_id,
+                real_providers_enabled=real_providers_enabled,
+            ),
+            "nvidia": _registered_real_provider(
+                "nvidia",
+                settings=settings,
+                workspace_id=workspace_id,
+                real_providers_enabled=real_providers_enabled,
             ),
             "mock": ProviderModel(
                 provider_slug="mock",

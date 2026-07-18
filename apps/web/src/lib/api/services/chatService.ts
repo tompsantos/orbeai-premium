@@ -65,6 +65,7 @@ const MODEL_KEYS: ModelKey[] = [
   "gpt",
   "claude",
   "gemini",
+  "nvidia",
   "qwen",
   "groq",
   "local",
@@ -89,42 +90,34 @@ function saveMessages(map: Record<string, Message[]>) {
 }
 
 function toChatMode(value: string | null | undefined): ChatMode {
-  if (value && CHAT_MODES.includes(value as ChatMode)) {
-    return value as ChatMode;
-  }
-
+  if (value && CHAT_MODES.includes(value as ChatMode)) return value as ChatMode;
   return "padrão";
 }
 
 function toModelKey(value: string | null | undefined): ModelKey {
   if (!value) return "auto";
-
-  if (MODEL_KEYS.includes(value as ModelKey)) {
-    return value as ModelKey;
-  }
+  if (MODEL_KEYS.includes(value as ModelKey)) return value as ModelKey;
 
   const normalized = value.toLowerCase();
-
   if (normalized.includes("gpt")) return "gpt";
   if (normalized.includes("claude")) return "claude";
   if (normalized.includes("gemini")) return "gemini";
+  if (normalized.includes("nvidia") || normalized.includes("nemotron")) return "nvidia";
   if (normalized.includes("qwen")) return "qwen";
   if (normalized.includes("groq")) return "groq";
   if (normalized.includes("local")) return "local";
-
   return "auto";
 }
 
 function toProviderSlug(value: string | null | undefined): ProviderSlug {
   const normalized = (value ?? "").toLowerCase();
-
   if (normalized.includes("openai") || normalized.includes("gpt")) return "openai";
   if (normalized.includes("anthropic") || normalized.includes("claude")) return "anthropic";
   if (normalized.includes("gemini")) return "gemini";
+  if (normalized.includes("nvidia") || normalized.includes("nemotron")) return "nvidia";
   if (normalized.includes("qwen")) return "qwen";
   if (normalized.includes("groq")) return "groq";
   if (normalized.includes("local")) return "local";
-
   return "mock";
 }
 
@@ -163,12 +156,21 @@ function toMessage(dto: BackendMessage): Message {
 
 function decisionFromBackend(payload: BackendChatSendResponse): RouterDecision {
   const provider = toProviderSlug(payload.provider);
-
+  const meta = payload.assistant_message.meta ?? {};
+  const routerDecision =
+    meta.router_decision && typeof meta.router_decision === "object"
+      ? meta.router_decision as Record<string, unknown>
+      : null;
   return {
     provider,
     model: payload.model,
-    reason: `Resposta gerada pelo backend real da orbeAI usando ${payload.provider}/${payload.model}.`,
-    fallbackChain: [provider],
+    reason:
+      typeof routerDecision?.reason === "string"
+        ? routerDecision.reason
+        : `Resposta gerada pelo backend real da orbeAI usando ${payload.provider}/${payload.model}.`,
+    fallbackChain: Array.isArray(routerDecision?.fallback_chain)
+      ? routerDecision.fallback_chain.map((item) => toProviderSlug(String(item)))
+      : [provider],
     routingMode: "automático",
     estimatedLatencyMs: 0,
     estimatedCostUsd: 0,
@@ -179,25 +181,21 @@ function decisionFromBackend(payload: BackendChatSendResponse): RouterDecision {
       provider: payload.provider,
       model: payload.model,
       source: "backend",
+      routerDecision,
+      providerAttempts: meta.provider_attempts,
     },
   };
 }
 
 export const chatService = {
   async list(): Promise<Chat[]> {
-    if (apiClient.isMock) {
-      return allChats();
-    }
-
+    if (apiClient.isMock) return allChats();
     const chats = await apiClient.request<BackendChat[]>("/v1/chats");
     return chats.map(toChat);
   },
 
   async get(id: string): Promise<Chat | null> {
-    if (apiClient.isMock) {
-      return allChats().find((c) => c.id === id) ?? null;
-    }
-
+    if (apiClient.isMock) return allChats().find((c) => c.id === id) ?? null;
     try {
       const chat = await apiClient.request<BackendChat>(`/v1/chats/${id}`);
       return toChat(chat);
@@ -207,10 +205,7 @@ export const chatService = {
   },
 
   async messages(chatId: string): Promise<Message[]> {
-    if (apiClient.isMock) {
-      return allMessages()[chatId] ?? [];
-    }
-
+    if (apiClient.isMock) return allMessages()[chatId] ?? [];
     const messages = await apiClient.request<BackendMessage[]>(`/v1/chats/${chatId}/messages`);
     return messages.map(toMessage);
   },
@@ -226,7 +221,6 @@ export const chatService = {
           model_preference: input.model ?? "auto",
         }),
       });
-
       return toChat(chat);
     }
 
@@ -239,30 +233,21 @@ export const chatService = {
       updatedAt: new Date().toISOString(),
       pinned: false,
     };
-
     saveChats([chat, ...allChats()]);
-
     const map = allMessages();
     map[chat.id] = [];
     saveMessages(map);
-
     auditService.log({ action: "chat.create", target: chat.id });
-
     return chat;
   },
 
   async appendMessage(chatId: string, msg: Message) {
-    if (!apiClient.isMock) {
-      return;
-    }
-
+    if (!apiClient.isMock) return;
     const map = allMessages();
     map[chatId] = [...(map[chatId] ?? []), msg];
     saveMessages(map);
-
     const chats = allChats();
     const idx = chats.findIndex((c) => c.id === chatId);
-
     if (idx >= 0) {
       chats[idx] = { ...chats[idx], updatedAt: new Date().toISOString() };
       saveChats(chats);
@@ -271,34 +256,22 @@ export const chatService = {
 
   async remove(chatId: string): Promise<void> {
     if (!apiClient.isMock) {
-      await apiClient.request<void>(`/v1/chats/${chatId}`, {
-        method: "DELETE",
-      });
-
+      await apiClient.request<void>(`/v1/chats/${chatId}`, { method: "DELETE" });
       return;
     }
-
-    const chats = allChats().filter((c) => c.id !== chatId);
-    saveChats(chats);
-
+    saveChats(allChats().filter((c) => c.id !== chatId));
     const map = allMessages();
     delete map[chatId];
     saveMessages(map);
-
     auditService.log({ action: "chat.delete", target: chatId, level: "warn" });
   },
 
   async togglePin(chatId: string, messageId: string) {
-    if (!apiClient.isMock) {
-      return;
-    }
-
+    if (!apiClient.isMock) return;
     const map = allMessages();
-
     map[chatId] = (map[chatId] ?? []).map((m) =>
       m.id === messageId ? { ...m, pinned: !m.pinned } : m,
     );
-
     saveMessages(map);
   },
 
@@ -313,7 +286,6 @@ export const chatService = {
           model_preference: opts.model ?? "auto",
         }),
       });
-
       return {
         decision: decisionFromBackend(payload),
         response: {
@@ -337,36 +309,26 @@ export const chatService = {
       mode: opts.mode,
       model: opts.model,
     });
-
     auditService.log({ action: "chat.send", target: chatId, level: "info" });
-
     return { decision, response, userMessage: null, assistantMessage: null, memoryEvents: [] };
   },
 
   async compare(content: string, models: ModelKey[], mode?: ChatMode) {
-    const results = await Promise.all(
-      models.map(async (m) => {
-        const decision = resolveRoute({ mode, model: m, prompt: content });
-
+    return Promise.all(
+      models.map(async (model) => {
+        const decision = resolveRoute({ mode, model, prompt: content });
         try {
-          const response = await runWithFallback(decision, {
-            prompt: content,
-            mode,
-            model: m,
-          });
-
-          return { model: m, decision, response, error: null as string | null };
-        } catch (e) {
+          const response = await runWithFallback(decision, { prompt: content, mode, model });
+          return { model, decision, response, error: null as string | null };
+        } catch (error) {
           return {
-            model: m,
+            model,
             decision,
             response: null,
-            error: (e as Error).message,
+            error: (error as Error).message,
           };
         }
       }),
     );
-
-    return results;
   },
 };

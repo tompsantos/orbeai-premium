@@ -71,7 +71,16 @@ export interface LiveChatEvent {
   result?: LiveChatResult | null;
 }
 
-const MODEL_KEYS: ModelKey[] = ["auto", "gpt", "claude", "gemini", "qwen", "groq", "local"];
+const MODEL_KEYS: ModelKey[] = [
+  "auto",
+  "gpt",
+  "claude",
+  "gemini",
+  "nvidia",
+  "qwen",
+  "groq",
+  "local",
+];
 const TASK_HINTS: TaskHint[] = [
   "código",
   "documento",
@@ -93,6 +102,7 @@ function toModelKey(value: string | null | undefined): ModelKey {
   if (normalized.includes("gpt")) return "gpt";
   if (normalized.includes("claude")) return "claude";
   if (normalized.includes("gemini")) return "gemini";
+  if (normalized.includes("nvidia") || normalized.includes("nemotron")) return "nvidia";
   if (normalized.includes("qwen")) return "qwen";
   if (normalized.includes("groq")) return "groq";
   return "local";
@@ -103,6 +113,7 @@ function toProviderSlug(value: string | null | undefined): ProviderSlug {
   if (normalized.includes("openai") || normalized.includes("gpt")) return "openai";
   if (normalized.includes("anthropic") || normalized.includes("claude")) return "anthropic";
   if (normalized.includes("gemini")) return "gemini";
+  if (normalized.includes("nvidia") || normalized.includes("nemotron")) return "nvidia";
   if (normalized.includes("qwen")) return "qwen";
   if (normalized.includes("groq")) return "groq";
   if (normalized.includes("cognition") || normalized.includes("local")) return "local";

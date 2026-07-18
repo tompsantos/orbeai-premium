@@ -115,6 +115,7 @@ def execute_chat_runtime(
         memory_context=memory_context,
         knowledge_context=knowledge_context,
         real_providers_enabled=real_providers_enabled,
+        workspace_id=workspace_id,
     )
     provider_error = _provider_error(execution)
     router_reason = decision.reason
