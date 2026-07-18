@@ -1,0 +1,32 @@
+name: phase2-live-knowledge-patch-v2
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: [self-hosted, linux, x64, orbeai-lab]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/phase2-live-knowledge-trace
+          fetch-depth: 0
+      - name: apply corrected patch
+        run: python scripts/phase2_live_knowledge_patch.py
+      - name: commit patch
+        run: |
+          git config user.name "orbeone-lab-01"
+          git config user.email "actions@orbeone.ia.br"
+          git add services/control-api/app/routers/chat_live.py \
+            services/control-api/app/services/cognition_client.py \
+            services/control-api/tests/test_live_knowledge_trace.py \
+            docs/live-chat-protocol.md
+          git commit -m "feat: persiste conhecimento usado no chat ao vivo"
+          git push origin HEAD:agent/phase2-live-knowledge-trace
