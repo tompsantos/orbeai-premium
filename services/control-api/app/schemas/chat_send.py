@@ -20,16 +20,6 @@ class MemoryEventRead(BaseModel):
     reason: str
 
 
-class KnowledgeSourceRead(BaseModel):
-    source_id: str
-    source_type: str
-    title: str
-    kind: str
-    score: float
-    project_id: str | None = None
-    metadata_only: bool = False
-
-
 class ChatSendResponse(BaseModel):
     chat_id: str
     provider: str
@@ -38,4 +28,3 @@ class ChatSendResponse(BaseModel):
     user_message: MessageRead
     assistant_message: MessageRead
     memory_events: list[MemoryEventRead] = Field(default_factory=list)
-    knowledge_sources: list[KnowledgeSourceRead] = Field(default_factory=list)
