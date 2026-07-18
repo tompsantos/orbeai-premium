@@ -7,7 +7,7 @@ COPY . .
 ARG VITE_API_BASE_URL=/api
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 ENV VITE_MOCK_MODE=false
-RUN npm run build
+RUN npm run typecheck && npm run build
 
 FROM node:22-alpine AS runtime
 
