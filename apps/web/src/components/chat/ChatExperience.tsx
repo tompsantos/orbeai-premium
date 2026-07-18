@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { ChatMode } from "@/types";
+import type { ChatMode, ModelKey } from "@/types";
 
 import { ChatBubble } from "./ChatBubble";
 import { ChatComposer } from "./ChatComposer";
@@ -33,6 +33,13 @@ const MODES: ChatMode[] = [
   "ops",
   "mentor",
   "safe",
+];
+
+const PROVIDER_OPTIONS: Array<{ value: ModelKey; label: string }> = [
+  { value: "auto", label: "automático" },
+  { value: "gpt", label: "openai" },
+  { value: "gemini", label: "gemini" },
+  { value: "nvidia", label: "nvidia" },
 ];
 
 function compactChatTitle(title: string, limit = 58): string {
@@ -84,6 +91,8 @@ export function ChatExperience() {
               </div>
               <div className="mt-0.5 flex min-w-0 items-center gap-1.5 truncate text-[11px] text-muted-foreground">
                 <span>orbe {chat.mode}</span>
+                <span className="text-muted-foreground/35">·</span>
+                <span>{PROVIDER_OPTIONS.find((item) => item.value === chat.model)?.label ?? chat.model}</span>
                 {chat.project && (
                   <>
                     <span className="text-muted-foreground/35">·</span>
@@ -99,7 +108,20 @@ export function ChatExperience() {
               </div>
             </div>
 
-            <div className="hidden items-center lg:flex">
+            <div className="hidden items-center gap-2 md:flex">
+              <Select value={chat.model} onValueChange={(value) => chat.setModel(value as ModelKey)}>
+                <SelectTrigger className="h-8 w-[112px] rounded-lg bg-background px-2 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PROVIDER_OPTIONS.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
               <Select value={chat.mode} onValueChange={(value) => chat.setMode(value as ChatMode)}>
                 <SelectTrigger className="h-8 w-[116px] rounded-lg bg-background px-2 text-xs">
                   <SelectValue />
@@ -234,7 +256,7 @@ export function ChatExperience() {
         open={chat.compareOpen}
         onOpenChange={chat.setCompareOpen}
         prompt={chat.comparePrompt}
-        models={["auto", "claude", "gpt", "gemini"]}
+        models={["auto", "gpt", "gemini", "nvidia"]}
       />
 
       <VoiceConversationDialog
