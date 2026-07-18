@@ -59,6 +59,7 @@ def capabilities() -> CapabilitiesResponse:
         approvals=True,
         scoped_builtin_memory=False,
         external_memory_context=True,
+        external_knowledge_context=True,
         tool_policy=True,
     )
 

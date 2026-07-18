@@ -24,6 +24,7 @@ browser -> control-api -> orbe-cognition -> Hermes AIAgent
 
 - `run.started`: execução registrada e iniciada.
 - `run.status`: estado visual seguro, sem raciocínio interno.
+- `knowledge.context`: informa que pesquisas ou materiais persistidos foram selecionados, expondo apenas metadados rastreáveis e nunca o conteúdo interno completo.
 - `response.commentary`: comentário intermediário completo.
 - `tool.started` e `tool.completed`: atividade de ferramenta sanitizada.
 - `approval.required`: o turno aguarda decisão do usuário.
@@ -38,5 +39,7 @@ browser -> control-api -> orbe-cognition -> Hermes AIAgent
 3. O fallback só ocorre antes do primeiro texto cognitivo, evitando respostas misturadas.
 4. Raciocínio interno não é transmitido. Apenas estados seguros de apresentação.
 5. Mensagem do usuário e auto-memory são persistidos antes do stream.
-6. Resposta, model run e auditoria são persistidos no estado terminal do turno.
-7. `always` não é uma opção pública. Mudanças permanentes de política exigem governança própria.
+6. Pesquisas e materiais são selecionados por workspace, projeto e relevância textual.
+7. Toda seleção de conhecimento gera auditoria com ids, tipo, score e indicação de referência sem conteúdo armazenado.
+8. Resposta, model run e auditoria são persistidos no estado terminal do turno.
+9. `always` não é uma opção pública. Mudanças permanentes de política exigem governança própria.

@@ -14,6 +14,7 @@ class TurnRequest(BaseModel):
     mode: str = Field(default="padrão", min_length=1, max_length=60)
     model: str | None = Field(default=None, max_length=180)
     memory_context: str | None = Field(default=None, max_length=30_000)
+    knowledge_context: str | None = Field(default=None, max_length=30_000)
     conversation_history: list[dict[str, Any]] = Field(default_factory=list)
     enabled_toolsets: list[str] | None = None
     disabled_toolsets: list[str] | None = None
@@ -57,4 +58,5 @@ class CapabilitiesResponse(BaseModel):
     approvals: bool
     scoped_builtin_memory: bool
     external_memory_context: bool
+    external_knowledge_context: bool
     tool_policy: bool

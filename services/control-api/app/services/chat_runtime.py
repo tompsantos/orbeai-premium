@@ -5,6 +5,10 @@ from typing import Any
 
 from app.core.config import get_settings
 from app.services.cognition_client import execute_cognition_turn
+from app.services.knowledge_context import (
+    KnowledgeContextSource,
+    resolve_knowledge_context,
+)
 from app.services.orbe_router import RouterDecision
 from app.services.providers.real import (
     ProviderExecutionResult,
@@ -22,6 +26,7 @@ class ChatRuntimeExecution:
     cognition_error: str | None
     runtime_name: str
     used_legacy_fallback: bool
+    knowledge_sources: list[KnowledgeContextSource]
 
 
 def execute_chat_runtime(
@@ -36,9 +41,18 @@ def execute_chat_runtime(
     model_preference: str,
     memory_context: str | None,
     conversation_history: list[dict[str, Any]],
+    knowledge_context: str | None = None,
 ) -> ChatRuntimeExecution:
     settings = get_settings()
     cognition_error: str | None = None
+    knowledge_sources: list[KnowledgeContextSource] = []
+
+    if knowledge_context is None:
+        knowledge_context, knowledge_sources = resolve_knowledge_context(
+            workspace_id=workspace_id,
+            chat_id=chat_id,
+            query=content,
+        )
 
     if settings.cognition_enabled:
         try:
@@ -49,6 +63,7 @@ def execute_chat_runtime(
                 content=content,
                 mode=mode,
                 memory_context=memory_context,
+                knowledge_context=knowledge_context,
                 conversation_history=conversation_history,
             )
             return ChatRuntimeExecution(
@@ -62,6 +77,7 @@ def execute_chat_runtime(
                 cognition_error=None,
                 runtime_name="orbe-cognition",
                 used_legacy_fallback=False,
+                knowledge_sources=knowledge_sources,
             )
         except Exception as exc:
             cognition_error = f"{type(exc).__name__}: {exc}"
@@ -78,6 +94,7 @@ def execute_chat_runtime(
             mode=mode,
             model_preference=model_preference,
             memory_context=memory_context,
+            knowledge_context=knowledge_context,
         )
         router_reason = decision.reason
 
@@ -93,6 +110,7 @@ def execute_chat_runtime(
             mode=mode,
             model_preference=model_preference,
             memory_context=memory_context,
+            knowledge_context=knowledge_context,
         )
         router_reason = (
             f"{decision.reason} A execução legada falhou e o orbe-mock foi acionado. "
@@ -113,4 +131,5 @@ def execute_chat_runtime(
         cognition_error=cognition_error,
         runtime_name="legacy-provider",
         used_legacy_fallback=bool(cognition_error),
+        knowledge_sources=knowledge_sources,
     )

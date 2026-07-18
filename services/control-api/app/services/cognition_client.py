@@ -8,6 +8,7 @@ from typing import Any, Literal
 import httpx
 
 from app.core.config import get_settings
+from app.services.knowledge_context import resolve_knowledge_context
 from app.services.providers.mock import estimate_tokens
 from app.services.providers.real import ProviderExecutionResult
 
@@ -29,6 +30,7 @@ def _turn_payload(
     content: str,
     mode: str,
     memory_context: str | None,
+    knowledge_context: str | None,
     conversation_history: list[dict[str, Any]],
     request_id: str | None = None,
 ) -> dict[str, Any]:
@@ -40,6 +42,7 @@ def _turn_payload(
         "request_id": request_id,
         "mode": mode,
         "memory_context": memory_context,
+        "knowledge_context": knowledge_context,
         "conversation_history": conversation_history,
     }
 
@@ -53,9 +56,18 @@ def execute_cognition_turn(
     mode: str,
     memory_context: str | None,
     conversation_history: list[dict[str, Any]],
+    knowledge_context: str | None = None,
 ) -> ProviderExecutionResult:
     settings = get_settings()
     started_at = perf_counter()
+
+    if knowledge_context is None:
+        knowledge_context, _ = resolve_knowledge_context(
+            workspace_id=workspace_id,
+            chat_id=chat_id,
+            query=content,
+        )
+
     payload = _turn_payload(
         workspace_id=workspace_id,
         user_id=user_id,
@@ -63,6 +75,7 @@ def execute_cognition_turn(
         content=content,
         mode=mode,
         memory_context=memory_context,
+        knowledge_context=knowledge_context,
         conversation_history=conversation_history,
     )
 
@@ -84,7 +97,9 @@ def execute_cognition_turn(
         raise CognitionExecutionError("orbe cognition retornou resposta vazia")
 
     model = str(data.get("model") or "orbe-cognition-default")
-    input_tokens = estimate_tokens(content + (memory_context or ""))
+    input_tokens = estimate_tokens(
+        content + (memory_context or "") + (knowledge_context or "")
+    )
     output_tokens = estimate_tokens(output)
 
     return ProviderExecutionResult(
@@ -145,8 +160,29 @@ def stream_cognition_turn(
     mode: str,
     memory_context: str | None,
     conversation_history: list[dict[str, Any]],
+    knowledge_context: str | None = None,
 ) -> Iterator[dict[str, Any]]:
     settings = get_settings()
+
+    if knowledge_context is None:
+        knowledge_context, sources = resolve_knowledge_context(
+            workspace_id=workspace_id,
+            chat_id=chat_id,
+            query=content,
+            request_id=request_id,
+        )
+    else:
+        sources = []
+
+    if sources:
+        yield {
+            "type": "knowledge.context",
+            "request_id": request_id,
+            "chat_id": chat_id,
+            "source_count": len(sources),
+            "sources": [source.public_payload() for source in sources],
+        }
+
     payload = _turn_payload(
         request_id=request_id,
         workspace_id=workspace_id,
@@ -155,6 +191,7 @@ def stream_cognition_turn(
         content=content,
         mode=mode,
         memory_context=memory_context,
+        knowledge_context=knowledge_context,
         conversation_history=conversation_history,
     )
 
