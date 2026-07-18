@@ -29,6 +29,7 @@ def _turn_payload(
     content: str,
     mode: str,
     memory_context: str | None,
+    knowledge_context: str | None,
     conversation_history: list[dict[str, Any]],
     request_id: str | None = None,
 ) -> dict[str, Any]:
@@ -40,6 +41,7 @@ def _turn_payload(
         "request_id": request_id,
         "mode": mode,
         "memory_context": memory_context,
+        "knowledge_context": knowledge_context,
         "conversation_history": conversation_history,
     }
 
@@ -52,6 +54,7 @@ def execute_cognition_turn(
     content: str,
     mode: str,
     memory_context: str | None,
+    knowledge_context: str | None,
     conversation_history: list[dict[str, Any]],
 ) -> ProviderExecutionResult:
     settings = get_settings()
@@ -63,6 +66,7 @@ def execute_cognition_turn(
         content=content,
         mode=mode,
         memory_context=memory_context,
+        knowledge_context=knowledge_context,
         conversation_history=conversation_history,
     )
 
@@ -84,7 +88,9 @@ def execute_cognition_turn(
         raise CognitionExecutionError("orbe cognition retornou resposta vazia")
 
     model = str(data.get("model") or "orbe-cognition-default")
-    input_tokens = estimate_tokens(content + (memory_context or ""))
+    input_tokens = estimate_tokens(
+        content + (memory_context or "") + (knowledge_context or "")
+    )
     output_tokens = estimate_tokens(output)
 
     return ProviderExecutionResult(
@@ -144,6 +150,7 @@ def stream_cognition_turn(
     content: str,
     mode: str,
     memory_context: str | None,
+    knowledge_context: str | None,
     conversation_history: list[dict[str, Any]],
 ) -> Iterator[dict[str, Any]]:
     settings = get_settings()
@@ -155,6 +162,7 @@ def stream_cognition_turn(
         content=content,
         mode=mode,
         memory_context=memory_context,
+        knowledge_context=knowledge_context,
         conversation_history=conversation_history,
     )
 
