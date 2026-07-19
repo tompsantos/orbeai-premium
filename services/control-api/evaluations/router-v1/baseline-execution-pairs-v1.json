@@ -1,0 +1,63 @@
+{
+  "baseline_version": "router-execution-pair-baseline-v1",
+  "replay_version": "router-replay-v1",
+  "dataset": {
+    "schema_version": "router-execution-pair-v1",
+    "dataset_id": "router-v1/dataset-execution-pairs-v1.jsonl",
+    "sha256": "2a183969e33daf6a19baabbceea483b74296af83c9195ebd9e497fdadb657bed",
+    "case_count": 20
+  },
+  "summary": {"total_cases": 20, "passed_cases": 20, "failed_cases": 0, "pass_rate": 1.0},
+  "categories": {
+    "context-tool": {"total": 2, "passed": 2, "failed": 0, "pass_rate": 1.0},
+    "explicit-action": {"total": 8, "passed": 8, "failed": 0, "pass_rate": 1.0},
+    "length-threshold": {"total": 2, "passed": 2, "failed": 0, "pass_rate": 1.0},
+    "multi-step-tool": {"total": 2, "passed": 2, "failed": 0, "pass_rate": 1.0},
+    "tool-token-overreach": {"total": 6, "passed": 6, "failed": 0, "pass_rate": 1.0}
+  },
+  "distribution": {
+    "route_kind": {"cognition": 13, "direct_model": 6, "memory": 1},
+    "execution_strategy": {"cognition": 13, "direct_provider": 7},
+    "provider_slug": {"gemini": 1, "openai": 6, "orbe-cognition": 13}
+  },
+  "pair_summary": {
+    "total_pairs": 10,
+    "passed_pairs": 10,
+    "failed_pairs": 0,
+    "outcomes": {"both_cognition": 3, "separated": 7}
+  },
+  "case_signatures": {
+    "github-language-explanatory": "cognition|cognition|orbe-cognition|openai|routing_policy,tool_required,cognition_available|cognitive_loop,direct_text_response|openai,gemini,nvidia,mock|0",
+    "github-language-operational": "cognition|cognition|orbe-cognition|openai|routing_policy,tool_required,cognition_available|cognitive_loop,direct_text_response|openai,gemini,nvidia,mock|0",
+    "terminal-language-explanatory": "cognition|cognition|orbe-cognition|openai|routing_policy,tool_required,cognition_available|cognitive_loop,direct_text_response|openai,gemini,nvidia,mock|0",
+    "terminal-language-operational": "cognition|cognition|orbe-cognition|openai|routing_policy,tool_required,cognition_available|cognitive_loop,direct_text_response|openai,gemini,nvidia,mock|0",
+    "deploy-language-explanatory": "cognition|cognition|orbe-cognition|openai|routing_policy,tool_required,cognition_available|cognitive_loop,direct_text_response|openai,gemini,nvidia,mock|0",
+    "deploy-language-operational": "cognition|cognition|orbe-cognition|openai|routing_policy,tool_required,cognition_available|cognitive_loop,direct_text_response|openai,gemini,nvidia,mock|0",
+    "file-action-explanatory": "direct_model|direct_provider|openai|openai|routing_policy,provider_configured|direct_text_response|openai,gemini,nvidia,mock|0",
+    "file-action-operational": "cognition|cognition|orbe-cognition|openai|routing_policy,tool_required,cognition_available|cognitive_loop,direct_text_response|openai,gemini,nvidia,mock|0",
+    "web-research-action-explanatory": "direct_model|direct_provider|gemini|gemini|semantic_research,provider_configured|direct_text_response|gemini,openai,nvidia,mock|0",
+    "web-research-action-operational": "cognition|cognition|orbe-cognition|gemini|semantic_research,tool_required,cognition_available|cognitive_loop,direct_text_response|gemini,openai,nvidia,mock|0",
+    "code-action-explanatory": "direct_model|direct_provider|openai|openai|semantic_code,provider_configured|direct_text_response|openai,gemini,nvidia,mock|0",
+    "code-action-operational": "cognition|cognition|orbe-cognition|openai|semantic_code,tool_required,cognition_available|cognitive_loop,direct_text_response|openai,gemini,nvidia,mock|0",
+    "document-action-explanatory": "direct_model|direct_provider|openai|openai|semantic_document,provider_configured|direct_text_response|openai,gemini,nvidia,mock|0",
+    "document-action-operational": "cognition|cognition|orbe-cognition|openai|semantic_document,tool_required,cognition_available|cognitive_loop,direct_text_response|openai,gemini,nvidia,mock|0",
+    "length-action-explanatory": "direct_model|direct_provider|openai|openai|routing_policy,provider_configured|direct_text_response|openai,gemini,nvidia,mock|0",
+    "length-action-operational": "cognition|cognition|orbe-cognition|openai|routing_policy,complex_request,cognition_available|cognitive_loop,direct_text_response|openai,gemini,nvidia,mock|0",
+    "multi-step-action-explanatory": "direct_model|direct_provider|openai|openai|semantic_code,provider_configured|direct_text_response|openai,gemini,nvidia,mock|0",
+    "multi-step-action-operational": "cognition|cognition|orbe-cognition|openai|semantic_code,tool_required,cognition_available|cognitive_loop,direct_text_response|openai,gemini,nvidia,mock|0",
+    "context-action-explanatory": "memory|direct_provider|openai|openai|routing_policy,context_memory,provider_configured|direct_text_response,external_memory_context|openai,gemini,nvidia,mock|0",
+    "context-action-operational": "cognition|cognition|orbe-cognition|openai|routing_policy,context_memory,tool_required,cognition_available|cognitive_loop,direct_text_response,external_memory_context|openai,gemini,nvidia,mock|0"
+  },
+  "pair_signatures": {
+    "github-language": "both_cognition|cognition|cognition",
+    "terminal-language": "both_cognition|cognition|cognition",
+    "deploy-language": "both_cognition|cognition|cognition",
+    "file-action": "separated|direct_provider|cognition",
+    "web-research-action": "separated|direct_provider|cognition",
+    "code-action": "separated|direct_provider|cognition",
+    "document-action": "separated|direct_provider|cognition",
+    "length-action": "separated|direct_provider|cognition",
+    "multi-step-action": "separated|direct_provider|cognition",
+    "context-action": "separated|direct_provider|cognition"
+  }
+}
