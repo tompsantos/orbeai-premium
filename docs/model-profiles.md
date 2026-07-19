@@ -4,7 +4,7 @@
 
 Esta documentação registra a fase 4 do orbeRouter. O objetivo é separar o conceito de provider do conceito de modelo e criar um catálogo versionado com telemetria real, sem inventar qualidade, contexto, custo, política de dados ou saúde.
 
-O contrato não altera o roteamento ativo e não participa do score. A exposição pela API é protegida pela feature flag `router_model_profiles`, desabilitada por padrão.
+O contrato não altera o roteamento ativo e não participa do score. A exposição pela API e pela interface é protegida pela feature flag `router_model_profiles`, desabilitada por padrão.
 
 ## contrato de perfil
 
@@ -142,6 +142,41 @@ GET /v1/model-providers/profiles?window_days=30
 
 Com a flag desligada, o endpoint retorna HTTP 404. Com a flag ligada no workspace, retorna somente os perfis gerados a partir do registry real e sua telemetria para a janela solicitada.
 
+## laboratório
+
+A rota interna abaixo apresenta o catálogo seguro:
+
+```text
+/app/model-profiles
+```
+
+A tela aparece no grupo `Avançado` da navegação como `Perfis de modelos` e permite consultar janelas de 7, 30 e 90 dias.
+
+Ela mostra somente dados do contrato oficial:
+
+- provider e modelo;
+- estado e ciclo de vida;
+- executabilidade;
+- p50 e p95;
+- sucesso e timeout;
+- amostras executadas e puladas;
+- tokens;
+- custo com estado explícito;
+- capacidades;
+- formatos;
+- streaming e ferramentas;
+- contexto e política de dados quando validados;
+- fonte de evidência de cada grupo de campos.
+
+A interface trata os estados abaixo sem criar dados locais:
+
+- `ready`: perfis reais carregados;
+- `disabled`: feature flag desligada;
+- `mock`: backend real não consultado;
+- `error`: falha explícita de carregamento.
+
+A tela não altera provider, modelo, fallback ou roteamento. Controles persistentes só serão adicionados quando existir contrato de enforcement por workspace.
+
 ## limites atuais
 
 Ainda não foram implementados:
@@ -152,14 +187,16 @@ Ainda não foram implementados:
 - política de dados validada;
 - qualidade por classe de tarefa;
 - ativação ou desativação individual de modelo;
-- interface nova no Laboratório;
 - uso das métricas no roteamento;
 - health score e circuit breaker;
 - retenção física ou agregação histórica além da janela de consulta;
-- associação obrigatória de cada tentativa ao model run e à mensagem.
+- associação obrigatória de cada tentativa ao model run e à mensagem;
+- remoção dos controles locais provisórios da tela antiga do Laboratório.
 
 ## próxima fatia
 
-A próxima etapa da fase 4 deverá mostrar o perfil seguro no Laboratório, permitir governança individual por modelo e fechar os campos de capacidade obrigatória e opcional. Depois disso, o projeto avança para o dataset e baseline da fase 5.
+A próxima etapa da fase 4 deverá criar governança persistente por workspace para ativação de modelos e provar que o router respeita essa configuração. O mesmo bloco deverá substituir ou remover os controles locais provisórios da tela antiga e fechar o contrato de capacidades obrigatórias e opcionais.
+
+Depois disso, o projeto avança para o dataset e baseline da fase 5.
 
 Nenhuma métrica desta fase entra no scoring antes do dataset e do baseline reproduzível.
