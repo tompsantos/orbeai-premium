@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from app.services.provider_registry import ProviderModel, ProviderRegistry
+from app.services.validated_model_metadata import resolve_validated_model_metadata
 
 MODEL_PROFILE_VERSION = "model-profile-v1"
 
@@ -85,6 +86,22 @@ def _model_evidence_source(provider: ProviderModel) -> ProfileEvidenceSource:
     return ProfileEvidenceSource.CODE_REGISTRY
 
 
+def _validation_status(provider: ProviderModel) -> str:
+    if not provider.is_real:
+        return "deterministic_mock"
+
+    metadata = resolve_validated_model_metadata(provider.provider_slug, provider.model_name)
+    if metadata is None:
+        return "profile_not_benchmarked"
+    if metadata.context_validated and metadata.data_policy_validated:
+        return "metadata_validated_profile_not_benchmarked"
+    if metadata.context_validated:
+        return "context_validated_policy_not_validated"
+    if metadata.data_policy_validated:
+        return "data_policy_validated_context_not_validated"
+    return "profile_not_benchmarked"
+
+
 def build_model_profile(provider: ProviderModel) -> ModelProfile:
     lifecycle = ModelLifecycle.EXPERIMENTAL if provider.is_real else ModelLifecycle.MOCK
     optional_capabilities = tuple(
@@ -96,7 +113,9 @@ def build_model_profile(provider: ProviderModel) -> ModelProfile:
     streaming = (
         "emulated" if "stream_emulation" in provider.capabilities else "not_implemented"
     )
-    validation_status = "profile_not_benchmarked" if provider.is_real else "deterministic_mock"
+    metadata = resolve_validated_model_metadata(provider.provider_slug, provider.model_name)
+    context_validated = metadata is not None and metadata.context_validated
+    data_policy_validated = metadata is not None and metadata.data_policy_validated
 
     return ModelProfile(
         profile_version=MODEL_PROFILE_VERSION,
@@ -116,10 +135,10 @@ def build_model_profile(provider: ProviderModel) -> ModelProfile:
         output_formats=("text",),
         streaming=streaming,
         tool_support="not_implemented",
-        context_window_tokens=None,
-        data_policy="not_validated",
-        validation_status=validation_status,
-        validated_at=None,
+        context_window_tokens=(metadata.context_window_tokens if context_validated else None),
+        data_policy=(metadata.data_policy if data_policy_validated else "not_validated"),
+        validation_status=_validation_status(provider),
+        validated_at=(metadata.validated_at if metadata is not None else None),
         evidence_sources={
             "provider": ProfileEvidenceSource.CODE_REGISTRY.value,
             "model": _model_evidence_source(provider).value,
@@ -128,8 +147,16 @@ def build_model_profile(provider: ProviderModel) -> ModelProfile:
             "formats": ProfileEvidenceSource.CODE_REGISTRY.value,
             "streaming": ProfileEvidenceSource.CODE_REGISTRY.value,
             "tools": ProfileEvidenceSource.CODE_REGISTRY.value,
-            "context_window": ProfileEvidenceSource.NOT_VALIDATED.value,
-            "data_policy": ProfileEvidenceSource.NOT_VALIDATED.value,
+            "context_window": (
+                ProfileEvidenceSource.OFFICIAL_DOCUMENTATION.value
+                if context_validated
+                else ProfileEvidenceSource.NOT_VALIDATED.value
+            ),
+            "data_policy": (
+                ProfileEvidenceSource.OFFICIAL_DOCUMENTATION.value
+                if data_policy_validated
+                else ProfileEvidenceSource.NOT_VALIDATED.value
+            ),
             "quality": ProfileEvidenceSource.NOT_VALIDATED.value,
             "latency": ProfileEvidenceSource.RUNTIME_TELEMETRY.value,
         },
