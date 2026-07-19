@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
+from app.core.config import Settings, get_settings
 from app.db.session import get_db
 from app.dependencies.auth import AuthContext, get_current_auth_context
 from app.schemas.auth import (
@@ -33,7 +34,14 @@ def register(
     payload: AuthRegisterRequest,
     request: Request,
     db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
 ) -> AuthTokenRead:
+    if not settings.public_registration_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Public registration is disabled",
+        )
+
     try:
         user = register_user(
             db,
