@@ -1,0 +1,53 @@
+{
+  "baseline_version": "router-boundary-baseline-v1",
+  "replay_version": "router-replay-v1",
+  "dataset": {
+    "schema_version": "router-boundary-case-v1",
+    "dataset_id": "router-v1/dataset-boundaries-v1.jsonl",
+    "sha256": "b4a5c1bd0297f151e7e3cb34313d5a9c819bb95cc915ee49cf810b4bd5a0373b",
+    "case_count": 20
+  },
+  "summary": {
+    "total_cases": 20,
+    "passed_cases": 20,
+    "failed_cases": 0,
+    "pass_rate": 1.0
+  },
+  "categories": {
+    "cognition-availability": {"total": 1, "passed": 1, "failed": 0, "pass_rate": 1.0},
+    "cognition-disabled": {"total": 1, "passed": 1, "failed": 0, "pass_rate": 1.0},
+    "context-precedence": {"total": 3, "passed": 3, "failed": 0, "pass_rate": 1.0},
+    "hint-threshold": {"total": 2, "passed": 2, "failed": 0, "pass_rate": 1.0},
+    "length-threshold": {"total": 4, "passed": 4, "failed": 0, "pass_rate": 1.0},
+    "manual-cognition": {"total": 1, "passed": 1, "failed": 0, "pass_rate": 1.0},
+    "provider-precedence": {"total": 5, "passed": 5, "failed": 0, "pass_rate": 1.0},
+    "tool-ambiguity": {"total": 3, "passed": 3, "failed": 0, "pass_rate": 1.0}
+  },
+  "distribution": {
+    "route_kind": {"cognition": 6, "direct_model": 11, "knowledge": 2, "memory": 1},
+    "execution_strategy": {"cognition": 6, "direct_provider": 14},
+    "provider_slug": {"gemini": 5, "openai": 9, "orbe-cognition": 6}
+  },
+  "case_signatures": {
+    "length-900-low": "direct_model|direct_provider|openai|openai|routing_policy,provider_configured|direct_text_response|openai,gemini,nvidia,mock|0",
+    "length-901-medium": "direct_model|direct_provider|openai|openai|routing_policy,provider_configured|direct_text_response|openai,gemini,nvidia,mock|0",
+    "length-2500-medium": "direct_model|direct_provider|openai|openai|routing_policy,provider_configured|direct_text_response|openai,gemini,nvidia,mock|0",
+    "length-2501-high": "cognition|cognition|orbe-cognition|openai|routing_policy,complex_request,cognition_available|cognitive_loop,direct_text_response|openai,gemini,nvidia,mock|0",
+    "two-hints-stay-low": "direct_model|direct_provider|openai|openai|semantic_document,provider_configured|direct_text_response|openai,gemini,nvidia,mock|0",
+    "three-hints-become-medium": "direct_model|direct_provider|gemini|gemini|semantic_research,provider_configured|direct_text_response|gemini,openai,nvidia,mock|0",
+    "manual-gemini-over-research": "direct_model|direct_provider|gemini|gemini|manual_model,provider_configured|direct_text_response|gemini,openai,nvidia,mock|0",
+    "cost-mode-over-code": "direct_model|direct_provider|gemini|gemini|routing_policy,provider_configured|direct_text_response|gemini,openai,nvidia,mock|0",
+    "research-over-document": "direct_model|direct_provider|gemini|gemini|semantic_research,provider_configured|direct_text_response|gemini,openai,nvidia,mock|0",
+    "document-provider-over-code-provider": "direct_model|direct_provider|openai|openai|semantic_document,provider_configured|direct_text_response|openai,gemini,nvidia,mock|0",
+    "research-over-risk-provider": "direct_model|direct_provider|gemini|gemini|semantic_research,provider_configured|direct_text_response|gemini,openai,nvidia,mock|0",
+    "explicit-tool-github": "cognition|cognition|orbe-cognition|openai|routing_policy,tool_required,cognition_available|cognitive_loop,direct_text_response|openai,gemini,nvidia,mock|0",
+    "negated-tool-github": "cognition|cognition|orbe-cognition|openai|routing_policy,tool_required,cognition_available|cognitive_loop,direct_text_response|openai,gemini,nvidia,mock|0",
+    "explanatory-github": "cognition|cognition|orbe-cognition|openai|routing_policy,tool_required,cognition_available|cognitive_loop,direct_text_response|openai,gemini,nvidia,mock|0",
+    "memory-context-route": "memory|direct_provider|openai|openai|routing_policy,context_memory,provider_configured|direct_text_response,external_memory_context|openai,gemini,nvidia,mock|0",
+    "knowledge-context-route": "knowledge|direct_provider|openai|openai|routing_policy,context_knowledge,provider_configured|direct_text_response,external_knowledge_context|openai,gemini,nvidia,mock|0",
+    "knowledge-wins-route-kind-with-both-contexts": "knowledge|direct_provider|openai|openai|routing_policy,context_memory,context_knowledge,provider_configured|direct_text_response,external_memory_context,external_knowledge_context|openai,gemini,nvidia,mock|0",
+    "high-complexity-with-cognition-disabled": "direct_model|direct_provider|openai|openai|routing_policy,cognition_unavailable,provider_configured|direct_text_response|openai,gemini,nvidia,mock|0",
+    "high-complexity-primary-unavailable": "cognition|cognition|orbe-cognition|openai|routing_policy,complex_request,cognition_available|cognitive_loop,direct_text_response|gemini,nvidia,mock|0",
+    "manual-mock-still-uses-cognition": "cognition|cognition|orbe-cognition|mock|manual_model,tool_required,cognition_available|cognitive_loop,direct_text_response|mock,openai,gemini,nvidia|0"
+  }
+}
