@@ -13,8 +13,8 @@ Legenda: `[x]` comprovado, `[ ]` pendente. Código, CI e ambiente devem ser trat
 - fase 2: desenvolvimento concluído, rollout da center pendente;
 - fase 3: concluída;
 - fase 4: concluída no PR #33;
-- fase 5: em andamento com baseline funcional, quarentena de casos reais e baseline de fronteiras;
-- próximo marco: promover casos reais revisados e definir o critério quantitativo de saída da fase 5.
+- fase 5: em andamento com três baselines sintéticos e quarentena de casos reais;
+- próximo marco: definir critérios quantitativos de saída e promover casos reais revisados.
 
 ## fase 0. fundação arquitetural
 
@@ -162,9 +162,25 @@ status: em andamento.
 - [x] cli `python scripts/router_replay.py --kind boundaries`;
 - [x] comportamento ambíguo documentado sem ser declarado correto.
 
+### 5d. direto versus cognition
+
+- [x] contrato `router-execution-pair-v1`;
+- [x] variantes explicativa e operacional por par;
+- [x] materialização no contrato funcional existente;
+- [x] 10 pares e 20 casos em 5 categorias;
+- [x] criação de arquivo, pesquisa web, código e documento;
+- [x] comprimento, múltiplos passos e contexto;
+- [x] termos GitHub, terminal e deploy;
+- [x] `router-execution-pair-baseline-v1`;
+- [x] cli `python scripts/router_replay.py --kind execution`;
+- [x] 10 de 10 pares e 20 de 20 casos aprovados na CI;
+- [x] 7 pares separados entre direto e cognition;
+- [x] 3 pares `both_cognition` registrados como sobreacionamento;
+- [x] sobreacionamentos documentados sem alteração prematura do kernel.
+
 ### saída da fase 5
 
-- [ ] ampliar casos direto versus cognition;
+- [x] ampliar casos direto versus cognition;
 - [ ] incluir casos reais revisados suficientes para as classes críticas;
 - [ ] definir limiar mínimo por categoria e regressões proibidas;
 - [ ] definir como candidatos futuros serão comparados offline;
@@ -240,7 +256,7 @@ status: não iniciada.
 - [ ] modelo cognitivo selecionado por contrato;
 - [ ] ferramentas, iterações, orçamento e aprovações declarados;
 - [ ] texto longo separado de tarefa multi-etapas;
-- [ ] dataset direto versus cognition;
+- [x] dataset direto versus cognition;
 - [ ] custo e sucesso medidos;
 - [ ] fallback somente antes do primeiro delta.
 
@@ -278,4 +294,5 @@ status: não iniciada.
 - PR #33: correlação obrigatória, falhas terminais e retenção auditada;
 - PR #34: dataset sintético, replay offline e baseline funcional v1;
 - PR #35: quarentena segura para casos reais;
-- PR #36: dataset e baseline de fronteiras e ambiguidades.
+- PR #36: dataset e baseline de fronteiras e ambiguidades;
+- PR #37: pares direto versus cognition e sobreacionamentos medidos.
