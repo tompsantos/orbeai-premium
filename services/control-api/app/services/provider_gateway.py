@@ -47,7 +47,7 @@ class GatewayExecution:
     attempts: tuple[ProviderAttempt, ...]
     selected_provider_slug: str
     used_fallback: bool
-    correlation_id: str
+    correlation_id: str = ""
 
     def attempts_payload(self) -> list[dict[str, object]]:
         return [attempt.persisted_payload() for attempt in self.attempts]
