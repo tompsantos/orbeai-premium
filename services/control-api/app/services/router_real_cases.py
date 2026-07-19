@@ -5,7 +5,6 @@ import hmac
 import json
 import re
 from collections.abc import Iterable
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
 
@@ -132,7 +131,7 @@ def _candidate_id(secret: bytes, workspace_id: str, message_id: str) -> str:
 
 
 def _content_fingerprint(secret: bytes, content: str) -> str:
-    return f"hmac-sha256:{_fingerprint(secret, f'content:{content}') }"
+    return f"hmac-sha256:{_fingerprint(secret, f'content:{content}')}"
 
 
 def _decision_payload(audit: AuditLog) -> dict[str, Any] | None:
