@@ -19,15 +19,15 @@ Uma fase não termina apenas porque existe código. Quando aplicável, deve have
 ## marco atual
 
 - data de referência: 2026-07-19;
-- commit oficial de referência: `d936409caa12faab9c41423fae2dd7722e4f875c`;
+- commit oficial de referência: `e48b1d0e15cde9f539a6ab34ad1addd2ba728928`;
 - kernel atual: `orbe-router-v1`;
 - aplicação ativa: `ai.orbeone.com.br`;
 - providers reais validados: OpenAI, Gemini e NVIDIA NIM;
 - cadastro público: fechado no código e validado na CI; publicação no ambiente rastreada separadamente;
 - fase 2: concluída no escopo de desenvolvimento do GitHub;
 - fase 3: concluída com CI verde e merge do PR #26;
-- fase 4: em andamento com contrato versionado de perfis operacionais atrás de feature flag;
-- próxima fatia técnica: telemetria real por provider e modelo antes de dataset e scoring inteligente.
+- fase 4: em andamento com perfis versionados e telemetria real atrás de feature flag;
+- próxima fatia técnica: perfil seguro no Laboratório, governança individual de modelos e fechamento do contrato de capacidades.
 
 ## fase 0. fundação arquitetural
 
@@ -164,21 +164,35 @@ status: em andamento.
 - [x] criar feature flag `router_model_profiles` desligada por padrão;
 - [x] documentar campos desconhecidos como `not_validated`.
 
+### persistência de tentativas
+
+- [x] criar tabela `provider_attempt_records` por workspace;
+- [x] gerar correlation id por execução do gateway;
+- [x] persistir sucesso, falha e skip;
+- [x] persistir falha terminal antes de retornar erro;
+- [x] classificar timeout, rate limit, autenticação, conexão e erro de provider;
+- [x] não persistir mensagem de erro bruta do provider;
+- [ ] associar obrigatoriamente tentativa a chat, mensagem e model run.
+
 ### telemetria
 
-- [ ] coletar latência p50 e p95;
-- [ ] coletar taxa de sucesso e timeout;
-- [ ] coletar tokens quando disponíveis;
-- [ ] calcular custo apenas com tabela configurada;
-- [x] identificar fonte prevista de cada dado no contrato;
-- [ ] criar janela e retenção de métricas.
+- [x] coletar latência p50 e p95 por provider e modelo;
+- [x] coletar taxa de sucesso e timeout;
+- [x] coletar tokens quando disponíveis;
+- [x] calcular custo apenas com tabela configurada;
+- [x] identificar fonte de cada dado;
+- [x] criar janela de consulta de 1 a 90 dias;
+- [ ] definir retenção física e agregação histórica de métricas;
+- [x] versionar telemetria como `model-telemetry-v1`;
+- [x] excluir tentativas puladas do denominador de confiabilidade.
 
 ### interface e operação
 
 - [x] expor endpoint interno seguro de perfis atrás de feature flag;
+- [x] anexar telemetria segura ao endpoint de perfis;
 - [ ] mostrar perfil seguro no Laboratório;
 - [ ] permitir ativar ou desativar modelo por workspace;
-- [x] não expor segredo, hint de chave, ciphertext ou payload bruto;
+- [x] não expor segredo, hint de chave, ciphertext, erro bruto ou payload bruto;
 - [x] excluir placeholders sem adapter do catálogo operacional.
 
 critério de saída: router possui catálogo operacional real, sem números cenográficos.
@@ -375,4 +389,5 @@ Adicionar novas decisões nesta tabela e criar ADR quando exigido.
 | 2026-07-19 | router será evoluído no github, validado na CI e só depois publicado | aceito | ADR 0003 |
 | 2026-07-19 | semântica nova começa em shadow mode | aceito | ADR 0003 |
 | 2026-07-19 | fase 2 de desenvolvimento encerrada no GitHub; rollout da center e ACL permanecem operacionais | aceito | `docs/phase-2-security-closure.md` |
-| 2026-07-19 | perfis de modelos começam como catálogo versionado, sem participar do scoring | em implementação | `docs/model-profiles.md` |
+| 2026-07-19 | perfis de modelos começam como catálogo versionado, sem participar do scoring | fundido | PR #28 |
+| 2026-07-19 | confiabilidade e latência usam tentativas persistidas; tokens e custo usam model runs | em implementação | `docs/model-profiles.md` |
