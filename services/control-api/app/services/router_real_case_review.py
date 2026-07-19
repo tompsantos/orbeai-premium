@@ -6,6 +6,9 @@ from collections import Counter
 from pathlib import Path
 from typing import Any, Literal
 
+from pydantic import BaseModel, ConfigDict
+from sqlalchemy.orm import Session
+
 from app.services.router_evaluation import RouterCaseExpected
 from app.services.router_real_case_review_io import (
     RouterRealCaseReviewSource,
@@ -21,8 +24,6 @@ from app.services.router_real_cases import (
     promote_reviewed_cases,
     review_template,
 )
-from pydantic import BaseModel, ConfigDict
-from sqlalchemy.orm import Session
 
 REVIEW_SESSION_VERSION = "router-real-case-review-session-v1"
 type CriticalRealCaseCategory = Literal[
