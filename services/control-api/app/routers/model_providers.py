@@ -18,8 +18,10 @@ from app.services.audit import write_audit_log
 from app.services.feature_flags import is_feature_enabled
 from app.services.model_controls import (
     MODEL_CONTROLS_VERSION,
+    WorkspaceModelControl,
     list_workspace_model_controls,
     model_control_key,
+    resolve_workspace_model_controls,
     upsert_workspace_model_control,
 )
 from app.services.model_profiles import build_model_profiles
@@ -107,8 +109,7 @@ def _require_profiles_enabled(
 def _control_read(
     provider: ProviderModel,
     *,
-    updated_at: str | None,
-    updated_by: str | None,
+    stored: WorkspaceModelControl | None,
 ) -> WorkspaceModelControlRead:
     return WorkspaceModelControlRead(
         control_version=MODEL_CONTROLS_VERSION,
@@ -120,8 +121,8 @@ def _control_read(
         effective_state=provider.state.value,
         state_reason=provider.state_reason,
         executable=provider.executable,
-        updated_at=updated_at,
-        updated_by=updated_by,
+        updated_at=stored.updated_at if stored else None,
+        updated_by=stored.updated_by if stored else None,
     )
 
 
@@ -185,8 +186,7 @@ def list_model_controls(
     return [
         _control_read(
             provider,
-            updated_at=(stored.get(model_control_key(slug, provider.model_name)).updated_at if stored.get(model_control_key(slug, provider.model_name)) else None),
-            updated_by=(stored.get(model_control_key(slug, provider.model_name)).updated_by if stored.get(model_control_key(slug, provider.model_name)) else None),
+            stored=stored.get(model_control_key(slug, provider.model_name)),
         )
         for slug, provider in registry.providers.items()
     ]
@@ -200,6 +200,7 @@ def update_model_control(
 ) -> WorkspaceModelControlRead:
     _require_admin(context)
     _require_profiles_enabled(db, context)
+    settings = get_settings()
     real_providers_enabled = is_feature_enabled(
         db=db,
         workspace_id=context.workspace_id,
@@ -207,7 +208,7 @@ def update_model_control(
         default=True,
     )
     registry = build_provider_registry(
-        get_settings(),
+        settings,
         real_providers_enabled=real_providers_enabled,
         workspace_id=context.workspace_id,
     )
@@ -225,6 +226,23 @@ def update_model_control(
             detail="Model control does not match the currently registered model",
         )
 
+    simulated_controls = resolve_workspace_model_controls(
+        context.workspace_id,
+        db=db,
+    )
+    simulated_controls[model_control_key(provider_slug, current.model_name)] = payload.enabled
+    simulated_registry = build_provider_registry(
+        settings,
+        real_providers_enabled=real_providers_enabled,
+        workspace_id=context.workspace_id,
+        workspace_model_controls=simulated_controls,
+    )
+    if not any(provider.executable for provider in simulated_registry.providers.values()):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="At least one model must remain executable in the workspace",
+        )
+
     control = upsert_workspace_model_control(
         db,
         workspace_id=context.workspace_id,
@@ -234,7 +252,7 @@ def update_model_control(
         actor_user_id=context.user_id,
     )
     effective_registry = build_provider_registry(
-        get_settings(),
+        settings,
         real_providers_enabled=real_providers_enabled,
         workspace_id=context.workspace_id,
     )
@@ -254,11 +272,7 @@ def update_model_control(
         },
         commit=True,
     )
-    return _control_read(
-        effective,
-        updated_at=control.updated_at,
-        updated_by=control.updated_by,
-    )
+    return _control_read(effective, stored=control)
 
 
 @router.get("", response_model=list[ModelProviderRead])
