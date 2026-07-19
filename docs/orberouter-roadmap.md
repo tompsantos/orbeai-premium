@@ -78,7 +78,7 @@ status: concluída.
 - [x] provider, modelo, latência e model run persistidos;
 - [x] fallback cognitivo apenas antes do primeiro delta;
 - [x] memória autorizada;
-- [x] conhecimento autorizado;
+- [x] conhecimento autorizado.
 
 ### credenciais e validação real
 
@@ -89,7 +89,7 @@ status: concluída.
 - [x] Gemini validado pela interface;
 - [x] NVIDIA validada pela interface;
 - [x] resposta real no chat;
-- [ ] registrar evidência técnica sanitizada com ids de decisão, mensagem e model run;
+- [ ] registrar evidência técnica sanitizada com ids de decisão, mensagem e model run.
 
 critério de saída: provider real executado pela interface com rastreabilidade completa.
 
@@ -116,7 +116,7 @@ status: em andamento.
 - [ ] restaurar ACL restritiva da VPC;
 - [ ] validar 22, 80 e 443;
 - [ ] validar conexão privada center para db;
-- [ ] confirmar ausência de portas públicas desnecessárias;
+- [ ] confirmar ausência de portas públicas desnecessárias.
 
 responsável pela ACL: operação manual do proprietário.
 
@@ -124,14 +124,14 @@ critério de saída: acesso público fechado e rede novamente em política restr
 
 ## fase 3. documentação mestre e governança
 
-status: em andamento.
+status: aguardando CI e merge.
 
 - [x] criar `docs/orberouter-manual.md`;
 - [x] criar `docs/orberouter-roadmap.md`;
-- [ ] atualizar `docs/roadmap.md` com o marco real;
-- [ ] adicionar links no README;
-- [ ] registrar ADR sobre evolução por evidência e shadow mode;
-- [ ] validar coerência entre manual, roadmap, ADR e código;
+- [x] atualizar `docs/roadmap.md` com o marco real;
+- [x] adicionar links no README;
+- [x] registrar ADR sobre evolução por evidência e shadow mode;
+- [x] validar coerência entre manual, roadmap, ADR e código;
 - [ ] CI verde;
 - [ ] merge no `main`.
 
@@ -149,7 +149,7 @@ status: não iniciada.
 - [ ] registrar formatos, streaming e ferramentas;
 - [ ] registrar contexto validado;
 - [ ] registrar política de dados;
-- [ ] registrar estado experimental, aprovado ou descontinuado;
+- [ ] registrar estado experimental, aprovado ou descontinuado.
 
 ### telemetria
 
@@ -158,13 +158,13 @@ status: não iniciada.
 - [ ] coletar tokens quando disponíveis;
 - [ ] calcular custo apenas com tabela configurada;
 - [ ] identificar fonte de cada dado;
-- [ ] criar janela e retenção de métricas;
+- [ ] criar janela e retenção de métricas.
 
 ### interface e operação
 
 - [ ] mostrar perfil seguro no Laboratório;
 - [ ] permitir ativar ou desativar modelo por workspace;
-- [ ] não expor segredo ou payload bruto;
+- [ ] não expor segredo ou payload bruto.
 
 critério de saída: router possui catálogo operacional real, sem números cenográficos.
 
@@ -182,7 +182,7 @@ status: não iniciada.
 - [ ] definir rotas aceitáveis e proibidas;
 - [ ] criar runner de replay offline;
 - [ ] medir baseline do router v1;
-- [ ] versionar dataset e resultados;
+- [ ] versionar dataset e resultados.
 
 critério de saída: existe baseline reproduzível antes de qualquer router candidato ativo.
 
@@ -200,7 +200,7 @@ status: não iniciada.
 - [ ] definir mock permitido;
 - [ ] definir necessidade de aprovação;
 - [ ] persistir políticas aplicadas na decisão;
-- [ ] testar que política sempre vence score;
+- [ ] testar que política sempre vence score.
 
 critério de saída: nenhuma pontuação pode violar segurança, orçamento ou governança.
 
@@ -217,7 +217,7 @@ status: não iniciada.
 - [ ] criar feature flag `router_scoring_v2`;
 - [ ] rodar offline no dataset;
 - [ ] comparar com baseline;
-- [ ] impedir ativação se houver regressão de hard gate;
+- [ ] impedir ativação se houver regressão de hard gate.
 
 critério de saída: seleção baseada em score explicável supera ou iguala baseline sem violar política.
 
@@ -239,7 +239,7 @@ Para cada ferramenta:
 - [ ] plano de remoção;
 - [ ] teste ou protótipo isolado;
 - [ ] resultado no dataset;
-- [ ] decisão: rejeitar, referenciar, adaptar ou adotar;
+- [ ] decisão: rejeitar, referenciar, adaptar ou adotar.
 
 critério de saída: decisões documentadas, sem dependência adicionada por entusiasmo.
 
@@ -256,7 +256,7 @@ status: não iniciada.
 - [ ] medir confiança e calibração;
 - [ ] revisar falsos positivos de cognition e ferramentas;
 - [ ] criar painel ou relatório offline;
-- [ ] definir gate para ativação parcial;
+- [ ] definir gate para ativação parcial.
 
 critério de saída: candidato semântico demonstra ganho medido antes de controlar tráfego.
 
@@ -273,7 +273,7 @@ status: não iniciada.
 - [ ] registrar transições;
 - [ ] excluir erros do usuário da métrica de saúde;
 - [ ] criar feature flag `router_health_routing`;
-- [ ] testar fallback orientado por saúde;
+- [ ] testar fallback orientado por saúde.
 
 critério de saída: router evita provider degradado com decisão auditável e reversível.
 
@@ -289,7 +289,7 @@ status: não iniciada.
 - [ ] distinguir texto longo de tarefa multi-etapas;
 - [ ] criar dataset direto versus cognition;
 - [ ] medir custo e sucesso do cognition;
-- [ ] manter fallback antes do primeiro delta;
+- [ ] manter fallback antes do primeiro delta.
 
 critério de saída: cognition entra por capacidade concreta, não por regra vaga.
 
@@ -305,7 +305,7 @@ status: não iniciada.
 - [ ] comparar custo, latência, erro e qualidade;
 - [ ] ampliar gradualmente;
 - [ ] provar rollback;
-- [ ] remover caminho antigo somente após estabilidade;
+- [ ] remover caminho antigo somente após estabilidade.
 
 critério de saída: router v2 ativo com métricas melhores ou iguais e rollback comprovado.
 
@@ -316,21 +316,21 @@ critério de saída: router v2 ativo com métricas melhores ou iguais e rollback
 - [ ] capability registry ativo;
 - [ ] autorização por workspace;
 - [ ] aprovação para ações destrutivas;
-- [ ] auditoria completa;
+- [ ] auditoria completa.
 
 ### conselho de modelos
 
 - [ ] experimento somente em shadow mode;
 - [ ] orçamento explícito;
 - [ ] critérios de consenso e desempate;
-- [ ] prova de ganho que justifique custo;
+- [ ] prova de ganho que justifique custo.
 
 ### missões duráveis e monitoramento
 
 - [ ] ADR específica;
 - [ ] avaliar necessidade de Temporal ou alternativa;
 - [ ] estado durável e idempotência;
-- [ ] cancelamento, retry e auditoria;
+- [ ] cancelamento, retry e auditoria.
 
 ## checklist obrigatório de cada PR do router
 
@@ -347,7 +347,7 @@ critério de saída: router v2 ativo com métricas melhores ou iguais e rollback
 - [ ] documentação;
 - [ ] CI verde;
 - [ ] nenhum segredo;
-- [ ] nenhuma capacidade fingida;
+- [ ] nenhuma capacidade fingida.
 
 ## registro de decisões
 
@@ -357,5 +357,5 @@ Adicionar novas decisões nesta tabela e criar ADR quando exigido.
 | --- | --- | --- | --- |
 | 2026-07-18 | orbeRouter no control-api e Hermes subordinado ao cognition | aceito | ADR 0002 |
 | 2026-07-19 | cadastro público fechado por padrão | fundido, ambiente pendente | PR #25 |
-| 2026-07-19 | router será evoluído no github, validado na CI e só depois publicado | aceito | manual mestre |
-| 2026-07-19 | semântica nova começa em shadow mode | planejado | ADR pendente |
+| 2026-07-19 | router será evoluído no github, validado na CI e só depois publicado | aceito | ADR 0003 |
+| 2026-07-19 | semântica nova começa em shadow mode | aceito | ADR 0003 |
