@@ -129,31 +129,31 @@ jobs:
           cache-dependency-path: apps/web/package.json
       - name: install
         run: npm install --silent
-      - name: typecheck
-        id: web_typecheck
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          npm run typecheck 2>&1 | tee /tmp/web-typecheck.log
-      - name: build
+      - name: build and generate route tree
         id: web_build
         continue-on-error: true
         run: |
           set -o pipefail
           npm run build 2>&1 | tee /tmp/web-build.log
+      - name: typecheck generated routes
+        id: web_typecheck
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          npm run typecheck 2>&1 | tee /tmp/web-typecheck.log
       - name: upload diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: web-diagnostics
           path: |
-            /tmp/web-typecheck.log
             /tmp/web-build.log
+            /tmp/web-typecheck.log
           retention-days: 7
           if-no-files-found: warn
       - name: enforce quality gate
         if: steps.web_typecheck.outcome == 'failure' || steps.web_build.outcome == 'failure'
         run: |
-          echo "typecheck=${{ steps.web_typecheck.outcome }}"
           echo "build=${{ steps.web_build.outcome }}"
+          echo "typecheck=${{ steps.web_typecheck.outcome }}"
           exit 1
