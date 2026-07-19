@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from time import perf_counter
+from uuid import uuid4
 
 from app.core.config import get_settings
 from app.services.orbe_router import ExecutionPlan, ExecutionStrategy
+from app.services.provider_attempt_records import persist_gateway_attempt_records
 from app.services.provider_registry import (
     ProviderRegistry,
     build_provider_registry,
@@ -45,15 +47,22 @@ class GatewayExecution:
     attempts: tuple[ProviderAttempt, ...]
     selected_provider_slug: str
     used_fallback: bool
+    correlation_id: str
 
     def attempts_payload(self) -> list[dict[str, object]]:
         return [attempt.persisted_payload() for attempt in self.attempts]
 
 
 class ProviderGatewayError(RuntimeError):
-    def __init__(self, message: str, attempts: tuple[ProviderAttempt, ...]) -> None:
+    def __init__(
+        self,
+        message: str,
+        attempts: tuple[ProviderAttempt, ...],
+        correlation_id: str,
+    ) -> None:
         super().__init__(message)
         self.attempts = attempts
+        self.correlation_id = correlation_id
 
 
 def classify_provider_failure(exc: Exception) -> str:
@@ -73,6 +82,20 @@ def classify_provider_failure(exc: Exception) -> str:
     if any(signal in combined for signal in ("connection", "connecterror", "network")):
         return "connection"
     return "provider_error"
+
+
+def _persist_attempts(
+    workspace_id: str | None,
+    correlation_id: str,
+    attempts: list[ProviderAttempt],
+) -> None:
+    if workspace_id is None:
+        return
+    persist_gateway_attempt_records(
+        workspace_id=workspace_id,
+        correlation_id=correlation_id,
+        attempts=[attempt.persisted_payload() for attempt in attempts],
+    )
 
 
 def execute_provider_plan(
@@ -97,6 +120,7 @@ def execute_provider_plan(
         real_providers_enabled=real_providers_enabled,
         workspace_id=workspace_id,
     )
+    correlation_id = f"gw_{uuid4().hex}"
     attempts: list[ProviderAttempt] = []
 
     for provider_slug in plan.provider_chain:
@@ -153,14 +177,18 @@ def execute_provider_plan(
                     latency_ms=int((perf_counter() - started_at) * 1000),
                 )
             )
+            _persist_attempts(workspace_id, correlation_id, attempts)
             return GatewayExecution(
                 result=result,
                 attempts=tuple(attempts),
                 selected_provider_slug=provider_slug,
                 used_fallback=provider_slug != plan.primary_provider_slug,
+                correlation_id=correlation_id,
             )
 
+    _persist_attempts(workspace_id, correlation_id, attempts)
     raise ProviderGatewayError(
         "nenhum provider do plano conseguiu executar a solicitação",
         tuple(attempts),
+        correlation_id,
     )
