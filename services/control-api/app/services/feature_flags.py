@@ -12,6 +12,16 @@ DEFAULT_FLAGS = [
         "description": "Permite operação com providers reais quando as chaves estão configuradas no backend.",
     },
     {
+        "key": "router_model_profiles",
+        "label": "Perfis operacionais de modelos",
+        "enabled": False,
+        "audience": "interno",
+        "description": (
+            "Expõe o catálogo versionado de modelos executáveis sem ativar scoring ou "
+            "roteamento novo."
+        ),
+    },
+    {
         "key": "auto_memory",
         "label": "Memória automática",
         "enabled": True,

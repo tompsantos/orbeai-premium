@@ -16,6 +16,7 @@ from app.services.workspace_settings import get_or_create_workspace_settings
 
 DEFAULT_FLAG_STATE = {
     "real_providers": True,
+    "router_model_profiles": False,
     "auto_memory": True,
     "memory_context": True,
     "knowledge_context": True,

@@ -1,0 +1,126 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from enum import StrEnum
+
+from app.services.provider_registry import ProviderModel, ProviderRegistry
+
+MODEL_PROFILE_VERSION = "model-profile-v1"
+
+
+class ModelLifecycle(StrEnum):
+    EXPERIMENTAL = "experimental"
+    APPROVED = "approved"
+    DEPRECATED = "deprecated"
+    MOCK = "mock"
+
+
+class ProfileEvidenceSource(StrEnum):
+    CODE_REGISTRY = "code_registry"
+    RUNTIME_CONFIGURATION = "runtime_configuration"
+    PROVIDER_DEFAULT = "provider_default"
+    RUNTIME_TELEMETRY = "runtime_telemetry"
+    OFFICIAL_DOCUMENTATION = "official_documentation"
+    NOT_VALIDATED = "not_validated"
+
+
+@dataclass(frozen=True)
+class ModelProfile:
+    profile_version: str
+    profile_id: str
+    provider_slug: str
+    provider_name: str
+    model_name: str
+    lifecycle: ModelLifecycle
+    executable: bool
+    provider_state: str
+    is_real: bool
+    capabilities: tuple[str, ...]
+    input_formats: tuple[str, ...]
+    output_formats: tuple[str, ...]
+    streaming: str
+    tool_support: str
+    context_window_tokens: int | None
+    data_policy: str
+    validation_status: str
+    validated_at: str | None
+    evidence_sources: dict[str, str]
+
+    def persisted_payload(self) -> dict[str, object]:
+        return {
+            "profile_version": self.profile_version,
+            "profile_id": self.profile_id,
+            "provider_slug": self.provider_slug,
+            "provider_name": self.provider_name,
+            "model_name": self.model_name,
+            "lifecycle": self.lifecycle.value,
+            "executable": self.executable,
+            "provider_state": self.provider_state,
+            "is_real": self.is_real,
+            "capabilities": list(self.capabilities),
+            "input_formats": list(self.input_formats),
+            "output_formats": list(self.output_formats),
+            "streaming": self.streaming,
+            "tool_support": self.tool_support,
+            "context_window_tokens": self.context_window_tokens,
+            "data_policy": self.data_policy,
+            "validation_status": self.validation_status,
+            "validated_at": self.validated_at,
+            "evidence_sources": dict(self.evidence_sources),
+        }
+
+
+def _model_evidence_source(provider: ProviderModel) -> ProfileEvidenceSource:
+    if provider.credential_source in {"workspace_vault", "environment"}:
+        return ProfileEvidenceSource.RUNTIME_CONFIGURATION
+    if provider.is_real:
+        return ProfileEvidenceSource.PROVIDER_DEFAULT
+    return ProfileEvidenceSource.CODE_REGISTRY
+
+
+def build_model_profile(provider: ProviderModel) -> ModelProfile:
+    lifecycle = ModelLifecycle.EXPERIMENTAL if provider.is_real else ModelLifecycle.MOCK
+    streaming = (
+        "emulated" if "stream_emulation" in provider.capabilities else "not_implemented"
+    )
+    validation_status = "profile_not_benchmarked" if provider.is_real else "deterministic_mock"
+
+    return ModelProfile(
+        profile_version=MODEL_PROFILE_VERSION,
+        profile_id=f"{provider.provider_slug}:{provider.model_name}:{MODEL_PROFILE_VERSION}",
+        provider_slug=provider.provider_slug,
+        provider_name=provider.provider_name,
+        model_name=provider.model_name,
+        lifecycle=lifecycle,
+        executable=provider.executable,
+        provider_state=provider.state.value,
+        is_real=provider.is_real,
+        capabilities=provider.capabilities,
+        input_formats=("text",),
+        output_formats=("text",),
+        streaming=streaming,
+        tool_support="not_implemented",
+        context_window_tokens=None,
+        data_policy="not_validated",
+        validation_status=validation_status,
+        validated_at=None,
+        evidence_sources={
+            "provider": ProfileEvidenceSource.CODE_REGISTRY.value,
+            "model": _model_evidence_source(provider).value,
+            "capabilities": ProfileEvidenceSource.CODE_REGISTRY.value,
+            "formats": ProfileEvidenceSource.CODE_REGISTRY.value,
+            "streaming": ProfileEvidenceSource.CODE_REGISTRY.value,
+            "tools": ProfileEvidenceSource.CODE_REGISTRY.value,
+            "context_window": ProfileEvidenceSource.NOT_VALIDATED.value,
+            "data_policy": ProfileEvidenceSource.NOT_VALIDATED.value,
+            "quality": ProfileEvidenceSource.NOT_VALIDATED.value,
+            "latency": ProfileEvidenceSource.RUNTIME_TELEMETRY.value,
+        },
+    )
+
+
+def build_model_profiles(registry: ProviderRegistry) -> tuple[ModelProfile, ...]:
+    preferred_order = ("openai", "gemini", "nvidia", "mock")
+    ordered_slugs = [slug for slug in preferred_order if slug in registry.providers]
+    ordered_slugs.extend(slug for slug in registry.providers if slug not in ordered_slugs)
+    return tuple(build_model_profile(registry.get(slug)) for slug in ordered_slugs)

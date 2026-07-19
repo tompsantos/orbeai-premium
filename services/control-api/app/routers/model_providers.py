@@ -1,6 +1,6 @@
 from os import getenv
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -8,8 +8,9 @@ from app.core.config import get_settings
 from app.db.session import get_db
 from app.dependencies.workspace import CurrentWorkspaceContext, get_current_workspace_context
 from app.models import ModelRun
-from app.schemas.model_providers import ModelProviderRead
+from app.schemas.model_providers import ModelProfileRead, ModelProviderRead
 from app.services.feature_flags import is_feature_enabled
+from app.services.model_profiles import build_model_profiles
 from app.services.provider_registry import ProviderModel, ProviderState, build_provider_registry
 
 router = APIRouter(prefix="/model-providers", tags=["model-providers"])
@@ -64,6 +65,39 @@ def api_key_status(provider: ProviderModel) -> str:
     if provider.state is ProviderState.MOCK:
         return "configurado"
     return "não configurado"
+
+
+@router.get("/profiles", response_model=list[ModelProfileRead])
+def list_model_profiles(
+    db: Session = Depends(get_db),
+    context: CurrentWorkspaceContext = Depends(get_current_workspace_context),
+) -> list[ModelProfileRead]:
+    if not is_feature_enabled(
+        db=db,
+        workspace_id=context.workspace_id,
+        key="router_model_profiles",
+        default=False,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Model profiles are disabled",
+        )
+
+    real_providers_enabled = is_feature_enabled(
+        db=db,
+        workspace_id=context.workspace_id,
+        key="real_providers",
+        default=True,
+    )
+    registry = build_provider_registry(
+        get_settings(),
+        real_providers_enabled=real_providers_enabled,
+        workspace_id=context.workspace_id,
+    )
+    return [
+        ModelProfileRead(**profile.persisted_payload())
+        for profile in build_model_profiles(registry)
+    ]
 
 
 @router.get("", response_model=list[ModelProviderRead])
