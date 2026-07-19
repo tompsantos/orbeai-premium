@@ -29,16 +29,28 @@ orbeAI web
 orbeAI control API
    ↓
 orbeRouter
-   ├── provider gateway → OpenAI, Gemini ou mock declarado
-   └── orbe cognition core → Hermes AIAgent
+   ├── provider gateway -> OpenAI, Gemini, NVIDIA NIM ou mock declarado
+   └── orbe cognition core -> Hermes AIAgent
 ```
 
 A orbeAI é o produto. O Hermes vive dentro de `services/cognition` e não controla autenticação, tenants, persistência, auditoria, orçamento ou políticas.
+
+## documentação de continuidade
+
+Antes de evoluir o router ou retomar o projeto em outro chat:
+
+1. ler `docs/orberouter-manual.md`;
+2. conferir `docs/orberouter-roadmap.md`;
+3. ler `docs/adr/0002-orberouter-v1.md` e `docs/adr/0003-orberouter-evolution-by-evidence.md`;
+4. comparar a documentação com o `main`, PRs abertos e última CI.
+
+O desenvolvimento acontece no GitHub. A CI valida o commit e a center recebe somente releases imutáveis. Código, CI, publicação e validação no ambiente são estados diferentes.
 
 ## infraestrutura-alvo
 
 - aplicação: `orbeone-center-01`;
 - banco PostgreSQL: `orbeone-db-01`;
+- bancada de CI: `orbeone-lab-01`;
 - deploy: containers Docker isolados;
 - persistência oficial: PostgreSQL da orbeOne;
 - runtime cognitivo: serviço interno, sem exposição pública direta.
@@ -51,12 +63,12 @@ services/control-api      auth, espaços, políticas, router, auditoria e persis
 services/cognition        runtime cognitivo derivado do Hermes
 packages/contracts        contratos compartilhados
 infra                     compose, nginx e implantação
-docs                      arquitetura, roadmap e decisões
+docs                      arquitetura, manual, roadmap e decisões
 ```
 
 ## estado atual
 
-### era 0 — fundação
+### era 0 - fundação
 
 Concluída:
 
@@ -69,7 +81,7 @@ Concluída:
 - CI com jobs `control-api`, `cognition` e `web` na `orbeone-lab-01`;
 - preparação para a infraestrutura Locaweb.
 
-### era 1 — identidade e primeira volta
+### era 1 - identidade e primeira volta
 
 A primeira grande volta da interface foi concluída e integrada ao `main` pelos PRs #5 a #15, exceto Projetos, que foi mantido provisoriamente para uma revisão funcional posterior.
 
@@ -89,31 +101,35 @@ A primeira grande volta da interface foi concluída e integrada ao `main` pelos 
 
 Algumas rotas ainda conservam nomes internos herdados. Essa dívida não bloqueia a era 2.
 
-### era 2 — orbeRouter v1
+### era 2 - orbeRouter
 
-Em construção:
+Primeira vitória real concluída e evolução orientada por evidência em construção:
 
 - kernel com `RouterRequest`, classificação, `RouterDecision` e `ExecutionPlan`;
 - registry de capacidades implementadas e futuras;
 - provider registry com estados reais de configuração;
+- adapters de OpenAI, Gemini e NVIDIA NIM;
+- cofre de credenciais por workspace com teste pela interface;
 - gateway direto com retry, tentativas e fallback explícito;
 - decisão persistida antes da execução;
 - separação entre provider direto e cognition;
 - evento SSE `router.decision`;
 - model run, latência, provider, modelo e tentativas persistidos;
-- mock identificado como mock.
+- mock identificado como mock;
+- respostas reais validadas no chat com os três providers;
+- cadastro público fechado por padrão no código oficial pelo PR #25.
 
-O primeiro marco só fecha quando uma mensagem enviada pela interface receber uma resposta de provider real e a execução puder ser provada tecnicamente.
+O próximo ciclo não começa escolhendo um framework. Ele começa criando perfis operacionais, telemetria, dataset e baseline. Depois entram políticas, scoring, pesquisa de ferramentas e shadow mode.
 
-## limites conscientes da prévia
+## limites conscientes
 
 - alguns botões ainda usam mocks, estado local e mensagens de confirmação;
 - Equipes e Espaços apresentam o modelo de uso, mas ainda precisam de integração funcional completa;
 - a voz é apenas a casca visual, sem captura de microfone ou transporte de áudio;
 - detalhes técnicos continuam acessíveis no Laboratório;
-- o modo mock permite navegar pela prévia sem autenticação real quando `VITE_MOCK_MODE` não está definido como `false`.
+- o modo mock permite navegar pela prévia quando configurado explicitamente.
 
-Nenhuma ação simulada deve ser tratada como persistência concluída. Uma resposta mock também não vale como evidência do marco real do orbeRouter.
+Nenhuma ação simulada deve ser tratada como persistência concluída. Uma resposta mock também não vale como evidência do orbeRouter.
 
 ## prévia no GitHub Codespaces
 
@@ -124,7 +140,7 @@ cd /workspaces/orbeai-premium
 bash .devcontainer/start-preview.sh
 ```
 
-O script inicia o frontend em modo de prévia e valida uma rota protegida. Depois de trocar de branch, encerre processos antigos do Vite antes de reiniciar para evitar código obsoleto na porta.
+O script inicia o frontend em modo de prévia e valida uma rota protegida. Depois de trocar de branch, encerrar processos antigos antes de reiniciar para evitar código obsoleto na porta.
 
 ## validação
 
@@ -138,14 +154,13 @@ Merge só pode ocorrer quando os jobs do head atual estiverem verdes de verdade.
 
 ## próximo marco
 
-1. validar a arquitetura do router v1 na CI;
-2. confirmar qual adapter real possui credencial disponível na bancada sem expor o segredo;
-3. enviar uma mensagem pelo frontend conectado;
-4. comprovar `router.decision`, provider registry, gateway ou cognition, model run, streaming e resposta persistida;
-5. registrar provider, modelo, motivo, fallback, latência e ids sanitizados;
-6. só então avançar para semântica, políticas e integração cognitiva mais profunda.
-
-Conhecimento visual, citações refinadas, responsividade fina e renomeação de rotas permanecem congelados enquanto não forem necessários para esse marco.
+1. publicar e validar no ambiente o fechamento do cadastro público;
+2. registrar evidência sanitizada da primeira vitória real do router;
+3. criar perfis operacionais dos modelos;
+4. coletar telemetria real;
+5. criar dataset e baseline reproduzível;
+6. implementar políticas e scoring v2 atrás de feature flag;
+7. avaliar ferramentas externas e semântica em shadow mode.
 
 ## upstreams
 
