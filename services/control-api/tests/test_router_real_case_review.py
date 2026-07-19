@@ -6,6 +6,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from app.models import AuditLog, Chat, Message
+from app.services.router_real_cases import (
+    RouterRealCaseReview,
+    build_real_case_candidate,
+    review_template,
+)
+from fastapi.testclient import TestClient
+
 from app.services.router_real_case_review import (
     RouterRealCaseReviewSession,
     RouterRealCaseReviewSource,
@@ -15,12 +22,6 @@ from app.services.router_real_case_review import (
     validate_phase5_review_session,
 )
 from app.services.router_real_case_review_web import create_review_app
-from app.services.router_real_cases import (
-    RouterRealCaseReview,
-    build_real_case_candidate,
-    review_template,
-)
-from fastapi.testclient import TestClient
 
 EXPORT_SECRET = "pytest-router-review-session-secret-with-more-than-32-characters"
 
@@ -210,6 +211,7 @@ def test_review_app_rejects_sensitive_sanitized_content(tmp_path: Path) -> None:
     assert session.summary()["accepted_count"] == 0
 
 
+
 def test_extended_review_scanner_blocks_operational_identifiers() -> None:
     samples = {
         "id 123e4567-e89b-42d3-a456-426614174000": "uuid_or_guid",
@@ -222,7 +224,6 @@ def test_extended_review_scanner_blocks_operational_identifiers() -> None:
 
     for content, expected in samples.items():
         assert expected in review_sanitization_violations(content)
-
 
 def test_review_app_requires_all_privacy_attestations(tmp_path: Path) -> None:
     session = _session(tmp_path, "pedido real sem dado pessoal")
