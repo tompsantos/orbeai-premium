@@ -38,9 +38,12 @@ export interface ModelProfile {
   modelName: string;
   lifecycle: ModelLifecycle;
   executable: boolean;
+  workspaceEnabled: boolean;
   providerState: string;
   isReal: boolean;
   capabilities: string[];
+  requiredCapabilities: string[];
+  optionalCapabilities: string[];
   inputFormats: string[];
   outputFormats: string[];
   streaming: string;
@@ -51,6 +54,20 @@ export interface ModelProfile {
   validatedAt?: string;
   evidenceSources: Record<string, string>;
   telemetry?: ModelTelemetry;
+}
+
+export interface WorkspaceModelControl {
+  controlVersion: string;
+  controlKey: string;
+  providerSlug: string;
+  providerName: string;
+  modelName: string;
+  enabled: boolean;
+  effectiveState: string;
+  stateReason: string;
+  executable: boolean;
+  updatedAt?: string;
+  updatedBy?: string;
 }
 
 export type ModelProfileCatalogStatus = "ready" | "disabled" | "mock";

@@ -8,8 +8,22 @@ from app.core.config import get_settings
 from app.db.session import get_db
 from app.dependencies.workspace import CurrentWorkspaceContext, get_current_workspace_context
 from app.models import ModelRun
-from app.schemas.model_providers import ModelProfileRead, ModelProviderRead
+from app.schemas.model_providers import (
+    ModelProfileRead,
+    ModelProviderRead,
+    WorkspaceModelControlRead,
+    WorkspaceModelControlUpdate,
+)
+from app.services.audit import write_audit_log
 from app.services.feature_flags import is_feature_enabled
+from app.services.model_controls import (
+    MODEL_CONTROLS_VERSION,
+    WorkspaceModelControl,
+    list_workspace_model_controls,
+    model_control_key,
+    resolve_workspace_model_controls,
+    upsert_workspace_model_control,
+)
 from app.services.model_profiles import build_model_profiles
 from app.services.model_telemetry import build_model_telemetry_map
 from app.services.provider_registry import ProviderModel, ProviderState, build_provider_registry
@@ -68,12 +82,18 @@ def api_key_status(provider: ProviderModel) -> str:
     return "não configurado"
 
 
-@router.get("/profiles", response_model=list[ModelProfileRead])
-def list_model_profiles(
-    window_days: int = Query(default=30, ge=1, le=90),
-    db: Session = Depends(get_db),
-    context: CurrentWorkspaceContext = Depends(get_current_workspace_context),
-) -> list[ModelProfileRead]:
+def _require_admin(context: CurrentWorkspaceContext) -> None:
+    if context.role not in {"owner", "admin"}:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only workspace owners and admins can manage model controls",
+        )
+
+
+def _require_profiles_enabled(
+    db: Session,
+    context: CurrentWorkspaceContext,
+) -> None:
     if not is_feature_enabled(
         db=db,
         workspace_id=context.workspace_id,
@@ -84,6 +104,35 @@ def list_model_profiles(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Model profiles are disabled",
         )
+
+
+def _control_read(
+    provider: ProviderModel,
+    *,
+    stored: WorkspaceModelControl | None,
+) -> WorkspaceModelControlRead:
+    return WorkspaceModelControlRead(
+        control_version=MODEL_CONTROLS_VERSION,
+        control_key=model_control_key(provider.provider_slug, provider.model_name),
+        provider_slug=provider.provider_slug,
+        provider_name=provider.provider_name,
+        model_name=provider.model_name,
+        enabled=provider.workspace_enabled,
+        effective_state=provider.state.value,
+        state_reason=provider.state_reason,
+        executable=provider.executable,
+        updated_at=stored.updated_at if stored else None,
+        updated_by=stored.updated_by if stored else None,
+    )
+
+
+@router.get("/profiles", response_model=list[ModelProfileRead])
+def list_model_profiles(
+    window_days: int = Query(default=30, ge=1, le=90),
+    db: Session = Depends(get_db),
+    context: CurrentWorkspaceContext = Depends(get_current_workspace_context),
+) -> list[ModelProfileRead]:
+    _require_profiles_enabled(db, context)
 
     settings = get_settings()
     real_providers_enabled = is_feature_enabled(
@@ -113,6 +162,117 @@ def list_model_profiles(
         )
         for profile in profiles
     ]
+
+
+@router.get("/controls", response_model=list[WorkspaceModelControlRead])
+def list_model_controls(
+    db: Session = Depends(get_db),
+    context: CurrentWorkspaceContext = Depends(get_current_workspace_context),
+) -> list[WorkspaceModelControlRead]:
+    _require_admin(context)
+    _require_profiles_enabled(db, context)
+    real_providers_enabled = is_feature_enabled(
+        db=db,
+        workspace_id=context.workspace_id,
+        key="real_providers",
+        default=True,
+    )
+    registry = build_provider_registry(
+        get_settings(),
+        real_providers_enabled=real_providers_enabled,
+        workspace_id=context.workspace_id,
+    )
+    stored = list_workspace_model_controls(db, context.workspace_id)
+    return [
+        _control_read(
+            provider,
+            stored=stored.get(model_control_key(slug, provider.model_name)),
+        )
+        for slug, provider in registry.providers.items()
+    ]
+
+
+@router.put("/controls", response_model=WorkspaceModelControlRead)
+def update_model_control(
+    payload: WorkspaceModelControlUpdate,
+    db: Session = Depends(get_db),
+    context: CurrentWorkspaceContext = Depends(get_current_workspace_context),
+) -> WorkspaceModelControlRead:
+    _require_admin(context)
+    _require_profiles_enabled(db, context)
+    settings = get_settings()
+    real_providers_enabled = is_feature_enabled(
+        db=db,
+        workspace_id=context.workspace_id,
+        key="real_providers",
+        default=True,
+    )
+    registry = build_provider_registry(
+        settings,
+        real_providers_enabled=real_providers_enabled,
+        workspace_id=context.workspace_id,
+    )
+    provider_slug = payload.provider_slug.strip().lower()
+    try:
+        current = registry.get(provider_slug)
+    except KeyError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Model provider is not registered",
+        ) from exc
+    if current.model_name != payload.model_name.strip():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Model control does not match the currently registered model",
+        )
+
+    simulated_controls = resolve_workspace_model_controls(
+        context.workspace_id,
+        db=db,
+    )
+    simulated_controls[model_control_key(provider_slug, current.model_name)] = payload.enabled
+    simulated_registry = build_provider_registry(
+        settings,
+        real_providers_enabled=real_providers_enabled,
+        workspace_id=context.workspace_id,
+        workspace_model_controls=simulated_controls,
+    )
+    if not any(provider.executable for provider in simulated_registry.providers.values()):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="At least one model must remain executable in the workspace",
+        )
+
+    control = upsert_workspace_model_control(
+        db,
+        workspace_id=context.workspace_id,
+        provider_slug=provider_slug,
+        model_name=current.model_name,
+        enabled=payload.enabled,
+        actor_user_id=context.user_id,
+    )
+    effective_registry = build_provider_registry(
+        settings,
+        real_providers_enabled=real_providers_enabled,
+        workspace_id=context.workspace_id,
+    )
+    effective = effective_registry.get(provider_slug)
+    write_audit_log(
+        db=db,
+        workspace_id=context.workspace_id,
+        action="model.control.update",
+        resource_type="model_profile",
+        resource_id=control.control_key,
+        meta={
+            "provider_slug": provider_slug,
+            "model_name": current.model_name,
+            "enabled": control.enabled,
+            "effective_state": effective.state.value,
+            "actor_user_id": context.user_id,
+        },
+        commit=True,
+    )
+    return _control_read(effective, stored=control)
 
 
 @router.get("", response_model=list[ModelProviderRead])

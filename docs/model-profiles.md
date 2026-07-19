@@ -2,201 +2,237 @@
 
 ## finalidade
 
-Esta documentação registra a fase 4 do orbeRouter. O objetivo é separar o conceito de provider do conceito de modelo e criar um catálogo versionado com telemetria real, sem inventar qualidade, contexto, custo, política de dados ou saúde.
+Esta documentação registra a fase 4 do orbeRouter. O objetivo é separar provider de modelo e manter um catálogo versionado com telemetria e governança reais, sem inventar qualidade, contexto, custo, política de dados ou saúde.
 
-O contrato não altera o roteamento ativo e não participa do score. A exposição pela API e pela interface é protegida pela feature flag `router_model_profiles`, desabilitada por padrão.
+O contrato não participa do scoring. A exposição e os controles são protegidos pela feature flag `router_model_profiles`, desabilitada por padrão.
 
 ## contrato de perfil
 
+A versão inicial é `model-profile-v1`.
+
 Cada `ModelProfile` registra:
 
-- versão do contrato;
-- identificador estável do perfil;
 - provider e modelo em campos separados;
+- identificador e versão estáveis;
 - ciclo de vida;
-- estado e executabilidade do provider;
-- capacidades declaradas no código;
+- estado, executabilidade e disponibilidade no workspace;
+- capacidades obrigatórias e opcionais;
 - formatos de entrada e saída;
-- estado de streaming;
-- estado de ferramentas;
-- janela de contexto validada;
+- streaming e ferramentas;
+- contexto validado;
 - política de dados;
 - estado e data de validação;
-- fonte de evidência por grupo de campos.
+- fonte de evidência por grupo de campos;
+- telemetria da janela consultada.
 
-A versão inicial é `model-profile-v1`.
+`stream_emulation` é capacidade opcional. As demais capacidades declaradas pelo registry são obrigatórias para o perfil atual.
 
 ## modelos incluídos
 
-O catálogo é construído somente a partir do `ProviderRegistry` executável da orbeAI:
+O catálogo nasce somente do `ProviderRegistry` da orbeAI:
 
 - OpenAI;
 - Google Gemini;
 - NVIDIA NIM;
 - mock declarado.
 
-Anthropic, Qwen, Groq e modelos locais continuam visíveis como placeholders na tela antiga, mas não recebem `ModelProfile` enquanto não houver adapter e execução real registrados.
+Anthropic, Qwen, Groq e modelos locais permanecem placeholders enquanto não houver adapter e execução real. Placeholder não recebe perfil operacional e não pode ser habilitado por controle de workspace.
 
 ## evidência e campos desconhecidos
 
-O perfil diferencia as fontes:
+Fontes reconhecidas:
 
-- `code_registry`: declaração comprovada pelo código atual;
-- `runtime_configuration`: modelo resolvido por configuração de ambiente ou cofre do workspace;
-- `provider_default`: modelo padrão do adapter sem credencial resolvida;
+- `code_registry`: declaração comprovada pelo código;
+- `runtime_configuration`: modelo resolvido pelo ambiente ou cofre;
+- `workspace_configuration`: disponibilidade definida pelo workspace;
+- `provider_default`: padrão do adapter sem credencial resolvida;
 - `runtime_telemetry`: dado calculado a partir de execuções persistidas;
-- `official_documentation`: dado futuro validado por documentação oficial;
+- `official_documentation`: documentação oficial validada;
 - `not_validated`: informação ainda não comprovada.
 
-Nesta fase:
+Enquanto não houver evidência:
 
 - `context_window_tokens` permanece `null`;
 - `data_policy` permanece `not_validated`;
-- qualidade permanece sem valor operacional;
-- providers reais ficam com ciclo de vida `experimental` até a validação do perfil;
-- o mock fica identificado como `mock`;
-- streaming é marcado como `emulated` somente quando o adapter atual declara essa capacidade;
-- ferramentas permanecem `not_implemented`.
+- qualidade não recebe nota operacional;
+- providers reais permanecem `experimental`;
+- ferramentas permanecem `not_implemented`;
+- mock permanece identificado como mock.
 
-## persistência de tentativas
+## governança por workspace
 
-Cada chamada ao provider gateway recebe um `correlation_id`. Antes de retornar sucesso ou falha terminal, o gateway persiste todas as tentativas em `provider_attempt_records`.
+A versão inicial do controle é `workspace-model-controls-v1`.
 
-Cada registro contém:
+Os controles ficam em metadata reservada de `WorkspaceSettings`, sob a chave `model_controls`. Essa chave:
 
-- workspace;
-- correlation id;
-- provider e modelo;
-- número da tentativa;
-- status `success`, `failed` ou `skipped`;
-- latência observada;
-- classificação sanitizada da falha;
-- tipo da exceção;
-- motivo operacional do estado quando a tentativa foi pulada.
+- não é retornada pelo endpoint genérico de configurações;
+- não pode ser alterada pelo patch genérico do workspace;
+- só é manipulada pelo serviço dedicado;
+- registra provider, modelo, estado, data e usuário responsável.
 
-A tabela possui campos opcionais para chat, mensagem e model run. A primeira implementação persiste a correlação do gateway; a ligação direta com essas entidades poderá ser aprofundada sem alterar o contrato de telemetria.
+A chave lógica do controle é:
 
-Erros brutos de provider não são gravados nesta tabela.
+```text
+provider_slug:model_name
+```
 
-## telemetria
+O nome exato do modelo faz parte da chave. Quando uma credencial troca o modelo configurado, controles antigos não são aplicados ao novo modelo por acidente.
 
-A versão inicial é `model-telemetry-v1`.
+### autorização
 
-A janela é informada pelo endpoint, com mínimo de 1 e máximo de 90 dias. O padrão é 30 dias.
+Somente membros com função `owner` ou `admin` podem consultar e alterar controles. Outros membros continuam podendo consultar perfis quando a feature flag estiver ligada, mas recebem a tela em modo somente leitura.
 
-Métricas por provider e modelo:
+### enforcement
 
-- quantidade total de tentativas;
-- tentativas realmente executadas;
-- sucessos;
-- falhas;
-- tentativas puladas;
-- timeouts;
-- taxa de sucesso;
-- taxa de timeout;
-- latência p50;
-- latência p95;
-- quantidade de model runs;
-- cobertura de tokens;
-- tokens de entrada e saída;
-- estado da configuração de custo;
-- quantidade de amostras de custo;
-- custo estimado total quando comprovável;
-- data da última tentativa.
+Um modelo desativado pelo workspace:
 
-Tentativas `skipped` não entram no denominador das taxas de sucesso e timeout. Os percentis usam interpolação linear sobre latências de tentativas `success` e `failed`.
+- recebe `workspace_enabled=false`;
+- entra no estado `disabled`;
+- recebe o reason code operacional `workspace_model_disabled`;
+- deixa de ser executável;
+- é removido da `provider_chain` antes da decisão;
+- não vira tentativa nem pode reaparecer no gateway.
 
-Tokens e custo vêm de `ModelRun`. Latência e confiabilidade vêm de `provider_attempt_records`, porque o tempo total do turno inclui trabalho que não pertence ao provider.
+A API simula o registry antes de persistir uma alteração. Ela retorna HTTP 409 quando a mudança deixaria o workspace sem nenhum modelo executável.
 
-## custo
+Essa governança representa disponibilidade operacional. Orçamento, classes de dados, permissões e políticas completas continuam reservados para a fase 6.
 
-O sistema não transforma zero em preço conhecido.
+## endpoints
 
-Estados possíveis:
-
-- `configured`: tabela configurada e amostras positivas existentes;
-- `configured_no_samples`: tabela configurada, mas ainda sem amostra válida;
-- `not_configured`: tabela de preço não configurada;
-- `not_applicable`: mock declarado.
-
-Quando o custo não é comprovável, `estimated_cost_usd_total` permanece `null`.
-
-## segurança
-
-O payload público do perfil e da telemetria não inclui:
-
-- chave de API;
-- hint da chave;
-- ciphertext;
-- fonte detalhada da credencial;
-- erro bruto do provider;
-- payload bruto de provider;
-- conteúdo de mensagens;
-- segredo ou configuração privada do workspace.
-
-## endpoint
+### perfis e telemetria
 
 ```text
 GET /v1/model-providers/profiles?window_days=30
 ```
 
-Com a flag desligada, o endpoint retorna HTTP 404. Com a flag ligada no workspace, retorna somente os perfis gerados a partir do registry real e sua telemetria para a janela solicitada.
+A janela aceita de 1 a 90 dias. Com a flag desligada, o endpoint retorna HTTP 404.
+
+### controles efetivos
+
+```text
+GET /v1/model-providers/controls
+```
+
+Retorna o controle e o estado efetivo dos modelos registrados para owner e admin.
+
+### atualizar controle
+
+```text
+PUT /v1/model-providers/controls
+```
+
+Payload:
+
+```json
+{
+  "provider_slug": "openai",
+  "model_name": "modelo-exato-do-registry",
+  "enabled": false
+}
+```
+
+A operação:
+
+- valida provider e nome atual do modelo;
+- rejeita referência stale;
+- protege o último executor;
+- persiste o controle;
+- reconstrói o registry;
+- registra audit log `model.control.update`;
+- devolve o estado efetivo.
+
+## persistência de tentativas
+
+Cada execução do gateway recebe um `correlation_id`. Sucessos, falhas e skips são persistidos em `provider_attempt_records` antes do retorno ou da falha terminal.
+
+O registro contém workspace, provider, modelo, tentativa, status, latência e classificação sanitizada da falha. Erro bruto, segredo e conteúdo da mensagem não são gravados.
+
+## telemetria
+
+A versão inicial é `model-telemetry-v1`.
+
+Métricas por provider e modelo:
+
+- tentativas totais e executadas;
+- sucessos, falhas e skips;
+- timeouts;
+- taxa de sucesso e timeout;
+- p50 e p95;
+- model runs e cobertura de tokens;
+- tokens de entrada e saída;
+- estado e amostras de custo;
+- custo estimado total quando comprovável;
+- última tentativa observada.
+
+Skips não entram no denominador de confiabilidade. Latência e confiabilidade vêm das tentativas; tokens e custo vêm de `ModelRun`.
+
+## custo
+
+Zero não é tratado como preço conhecido.
+
+Estados:
+
+- `configured`;
+- `configured_no_samples`;
+- `not_configured`;
+- `not_applicable` para mock.
+
+Quando custo não é comprovável, o total permanece `null`.
 
 ## laboratório
 
-A rota interna abaixo apresenta o catálogo seguro:
+Rotas:
 
 ```text
+/app/models
 /app/model-profiles
 ```
 
-A tela aparece no grupo `Avançado` da navegação como `Perfis de modelos` e permite consultar janelas de 7, 30 e 90 dias.
+`/app/models` agora apresenta providers e model runs reais. Foram removidos:
 
-Ela mostra somente dados do contrato oficial:
+- provider padrão salvo em `localStorage`;
+- fallback local;
+- modo de roteamento local;
+- decisão simulada;
+- latência, custo e qualidade fabricados no frontend.
 
-- provider e modelo;
-- estado e ciclo de vida;
-- executabilidade;
-- p50 e p95;
-- sucesso e timeout;
-- amostras executadas e puladas;
-- tokens;
-- custo com estado explícito;
-- capacidades;
-- formatos;
-- streaming e ferramentas;
-- contexto e política de dados quando validados;
-- fonte de evidência de cada grupo de campos.
+`/app/model-profiles` apresenta perfis, telemetria, fontes de evidência e controles reais. Owner e admin podem habilitar ou desabilitar modelos; outros membros recebem modo somente leitura.
 
-A interface trata os estados abaixo sem criar dados locais:
+Estados seguros da tela:
 
-- `ready`: perfis reais carregados;
-- `disabled`: feature flag desligada;
-- `mock`: backend real não consultado;
-- `error`: falha explícita de carregamento.
+- `ready`;
+- `disabled`;
+- `mock`;
+- `error`.
 
-A tela não altera provider, modelo, fallback ou roteamento. Controles persistentes só serão adicionados quando existir contrato de enforcement por workspace.
+## segurança
+
+O payload e a interface não incluem:
+
+- chave ou hint de API;
+- ciphertext;
+- fonte detalhada da credencial;
+- erro bruto;
+- payload de provider;
+- conteúdo de mensagens;
+- metadata reservada completa;
+- segredo do workspace.
 
 ## limites atuais
 
-Ainda não foram implementados:
+Ainda não foram concluídos:
 
-- persistência própria dos perfis;
-- data de validação por modelo;
-- contexto validado;
+- contexto validado por modelo;
 - política de dados validada;
+- data formal de validação;
 - qualidade por classe de tarefa;
-- ativação ou desativação individual de modelo;
-- uso das métricas no roteamento;
+- retenção física e agregação histórica;
+- associação obrigatória de tentativa a mensagem e model run;
 - health score e circuit breaker;
-- retenção física ou agregação histórica além da janela de consulta;
-- associação obrigatória de cada tentativa ao model run e à mensagem;
-- remoção dos controles locais provisórios da tela antiga do Laboratório.
+- uso de telemetria em scoring.
 
 ## próxima fatia
 
-A próxima etapa da fase 4 deverá criar governança persistente por workspace para ativação de modelos e provar que o router respeita essa configuração. O mesmo bloco deverá substituir ou remover os controles locais provisórios da tela antiga e fechar o contrato de capacidades obrigatórias e opcionais.
+A próxima fatia da fase 4 deverá validar contexto e política de dados a partir de fontes oficiais para modelos conhecidos, mantendo modelos desconhecidos como `not_validated`. Depois será decidido se retenção e associação obrigatória fecham nesta fase ou migram para a fase de saúde e observabilidade.
 
-Depois disso, o projeto avança para o dataset e baseline da fase 5.
-
-Nenhuma métrica desta fase entra no scoring antes do dataset e do baseline reproduzível.
+Nenhuma métrica entra no scoring antes do dataset e do baseline reproduzível da fase 5.

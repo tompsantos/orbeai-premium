@@ -13,11 +13,12 @@ from app.schemas.workspace import (
     WorkspaceUpdate,
 )
 from app.services.audit import write_audit_log
+from app.services.model_controls import MODEL_CONTROLS_META_KEY
 from app.services.workspace_settings import get_or_create_workspace_settings
 
 router = APIRouter(prefix="/workspace", tags=["workspace"])
 
-_RESERVED_META_KEYS = {"provider_credentials"}
+_RESERVED_META_KEYS = {"provider_credentials", MODEL_CONTROLS_META_KEY}
 
 
 def _public_meta(meta: dict[str, Any] | None) -> dict[str, Any] | None:

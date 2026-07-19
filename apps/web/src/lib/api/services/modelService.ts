@@ -1,20 +1,12 @@
 import { apiClient } from "@/lib/api/client";
-import { localStore, STORAGE_KEYS } from "@/lib/storage/localStore";
 import { mockProviders } from "@/lib/mock/data";
+import { localStore, STORAGE_KEYS } from "@/lib/storage/localStore";
 import type {
-  ModelConfig,
   ModelProvider,
   ModelRun,
   ProviderSlug,
   ProviderUsageSummary,
-  RoutingMode,
 } from "@/types";
-
-const DEFAULT_CONFIG: ModelConfig = {
-  defaultProvider: "mock",
-  fallbackChain: ["mock"],
-  routingMode: "automático",
-};
 
 interface BackendModelProvider {
   slug: string;
@@ -129,6 +121,7 @@ function summarizeRuns(runs: ModelRun[]): ProviderUsageSummary[] {
       latencySum: 0,
       latencyCount: 0,
     };
+
     current.summary.requests += 1;
     current.summary.tokens += run.inputTokens + run.outputTokens;
     current.summary.costUsd += run.estimatedCostUsd;
@@ -155,35 +148,24 @@ export const modelService = {
       const providers = await apiClient.request<BackendModelProvider[]>("/v1/model-providers");
       return providers.map(toModelProvider);
     }
+
     localStore.ensureSeeded();
     return localStore.get<ModelProvider[]>(STORAGE_KEYS.providers, mockProviders);
+  },
+
+  async runs(limit = 50): Promise<ModelRun[]> {
+    return loadModelRuns(limit);
   },
 
   async modelRuns(limit = 50): Promise<ModelRun[]> {
     return loadModelRuns(limit);
   },
 
+  async usageSummary(limit = 200): Promise<ProviderUsageSummary[]> {
+    return summarizeRuns(await loadModelRuns(limit));
+  },
+
   async providerUsage(): Promise<ProviderUsageSummary[]> {
-    const runs = await loadModelRuns(200);
-    return summarizeRuns(runs);
-  },
-
-  async getConfig(): Promise<ModelConfig> {
-    return localStore.get<ModelConfig>(STORAGE_KEYS.modelConfig, DEFAULT_CONFIG);
-  },
-
-  async setDefaultProvider(slug: ProviderSlug) {
-    const cfg = await this.getConfig();
-    return localStore.set(STORAGE_KEYS.modelConfig, { ...cfg, defaultProvider: slug });
-  },
-
-  async setRoutingMode(mode: RoutingMode) {
-    const cfg = await this.getConfig();
-    return localStore.set(STORAGE_KEYS.modelConfig, { ...cfg, routingMode: mode });
-  },
-
-  async setFallbackChain(chain: ProviderSlug[]) {
-    const cfg = await this.getConfig();
-    return localStore.set(STORAGE_KEYS.modelConfig, { ...cfg, fallbackChain: chain });
+    return summarizeRuns(await loadModelRuns(200));
   },
 };

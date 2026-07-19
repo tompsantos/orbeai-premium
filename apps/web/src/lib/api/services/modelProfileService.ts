@@ -5,6 +5,7 @@ import type {
   ModelProfile,
   ModelProfileCatalog,
   ModelTelemetry,
+  WorkspaceModelControl,
 } from "@/types/modelProfiles";
 
 interface BackendModelTelemetry {
@@ -39,9 +40,12 @@ interface BackendModelProfile {
   model_name: string;
   lifecycle: string;
   executable: boolean;
+  workspace_enabled: boolean;
   provider_state: string;
   is_real: boolean;
   capabilities: string[];
+  required_capabilities: string[];
+  optional_capabilities: string[];
   input_formats: string[];
   output_formats: string[];
   streaming: string;
@@ -52,6 +56,20 @@ interface BackendModelProfile {
   validated_at: string | null;
   evidence_sources: Record<string, string>;
   telemetry: BackendModelTelemetry | null;
+}
+
+interface BackendWorkspaceModelControl {
+  control_version: string;
+  control_key: string;
+  provider_slug: string;
+  provider_name: string;
+  model_name: string;
+  enabled: boolean;
+  effective_state: string;
+  state_reason: string;
+  executable: boolean;
+  updated_at: string | null;
+  updated_by: string | null;
 }
 
 function optionalNumber(value: number | null): number | undefined {
@@ -111,9 +129,12 @@ function toProfile(dto: BackendModelProfile): ModelProfile {
     modelName: dto.model_name,
     lifecycle: toLifecycle(dto.lifecycle),
     executable: dto.executable,
+    workspaceEnabled: dto.workspace_enabled,
     providerState: dto.provider_state,
     isReal: dto.is_real,
     capabilities: dto.capabilities,
+    requiredCapabilities: dto.required_capabilities,
+    optionalCapabilities: dto.optional_capabilities,
     inputFormats: dto.input_formats,
     outputFormats: dto.output_formats,
     streaming: dto.streaming,
@@ -124,6 +145,22 @@ function toProfile(dto: BackendModelProfile): ModelProfile {
     validatedAt: optionalText(dto.validated_at),
     evidenceSources: dto.evidence_sources,
     telemetry: dto.telemetry ? toTelemetry(dto.telemetry) : undefined,
+  };
+}
+
+function toControl(dto: BackendWorkspaceModelControl): WorkspaceModelControl {
+  return {
+    controlVersion: dto.control_version,
+    controlKey: dto.control_key,
+    providerSlug: dto.provider_slug,
+    providerName: dto.provider_name,
+    modelName: dto.model_name,
+    enabled: dto.enabled,
+    effectiveState: dto.effective_state,
+    stateReason: dto.state_reason,
+    executable: dto.executable,
+    updatedAt: optionalText(dto.updated_at),
+    updatedBy: optionalText(dto.updated_by),
   };
 }
 
@@ -144,5 +181,42 @@ export const modelProfileService = {
       }
       throw error;
     }
+  },
+
+  async controls(): Promise<WorkspaceModelControl[] | null> {
+    if (apiClient.isMock) return null;
+    try {
+      const controls = await apiClient.request<BackendWorkspaceModelControl[]>(
+        "/v1/model-providers/controls",
+      );
+      return controls.map(toControl);
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message === "Only workspace owners and admins can manage model controls"
+      ) {
+        return null;
+      }
+      throw error;
+    }
+  },
+
+  async setControl(
+    providerSlug: string,
+    modelName: string,
+    enabled: boolean,
+  ): Promise<WorkspaceModelControl> {
+    const control = await apiClient.request<BackendWorkspaceModelControl>(
+      "/v1/model-providers/controls",
+      {
+        method: "PUT",
+        body: JSON.stringify({
+          provider_slug: providerSlug,
+          model_name: modelName,
+          enabled,
+        }),
+      },
+    );
+    return toControl(control);
   },
 };

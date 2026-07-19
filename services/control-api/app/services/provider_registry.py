@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, replace
 from enum import StrEnum
 
 from app.core.config import Settings, get_settings
 from app.db.session import SessionLocal
 from app.services.bootstrap import get_or_create_default_workspace
+from app.services.model_controls import model_is_enabled, resolve_workspace_model_controls
 from app.services.provider_credentials import (
     CredentialDecryptionError,
     provider_definition,
@@ -32,10 +34,14 @@ class ProviderModel:
     is_real: bool
     credential_source: str | None = None
     key_hint: str | None = None
+    workspace_enabled: bool = True
 
     @property
     def executable(self) -> bool:
-        return self.state in {ProviderState.CONFIGURED, ProviderState.MOCK}
+        return self.workspace_enabled and self.state in {
+            ProviderState.CONFIGURED,
+            ProviderState.MOCK,
+        }
 
     def persisted_payload(self) -> dict[str, object]:
         return {
@@ -47,6 +53,7 @@ class ProviderModel:
             "capabilities": list(self.capabilities),
             "is_real": self.is_real,
             "executable": self.executable,
+            "workspace_enabled": self.workspace_enabled,
             "credential_source": self.credential_source,
             "key_hint": self.key_hint,
         }
@@ -74,8 +81,10 @@ class ProviderRegistry:
 
         chain: list[str] = []
         for provider_slug in ordered:
-            if provider_slug in self.providers and provider_slug not in chain:
-                chain.append(provider_slug)
+            provider = self.providers.get(provider_slug)
+            if provider is None or not provider.executable or provider_slug in chain:
+                continue
+            chain.append(provider_slug)
         return chain
 
     def persisted_payload(self) -> list[dict[str, object]]:
@@ -153,43 +162,71 @@ def _registered_real_provider(
     )
 
 
+def _apply_workspace_control(
+    provider: ProviderModel,
+    controls: Mapping[str, bool],
+) -> ProviderModel:
+    if model_is_enabled(
+        controls,
+        provider.provider_slug,
+        provider.model_name,
+    ):
+        return provider
+    return replace(
+        provider,
+        state=ProviderState.DISABLED,
+        state_reason="workspace_model_disabled",
+        workspace_enabled=False,
+    )
+
+
 def build_provider_registry(
     settings: Settings | None = None,
     *,
     real_providers_enabled: bool = True,
     workspace_id: str | None = None,
+    workspace_model_controls: Mapping[str, bool] | None = None,
 ) -> ProviderRegistry:
     settings = settings or get_settings()
     workspace_id = resolve_registry_workspace_id(workspace_id)
+    controls = (
+        dict(workspace_model_controls)
+        if workspace_model_controls is not None
+        else resolve_workspace_model_controls(workspace_id)
+    )
 
+    providers = {
+        "openai": _registered_real_provider(
+            "openai",
+            settings=settings,
+            workspace_id=workspace_id,
+            real_providers_enabled=real_providers_enabled,
+        ),
+        "gemini": _registered_real_provider(
+            "gemini",
+            settings=settings,
+            workspace_id=workspace_id,
+            real_providers_enabled=real_providers_enabled,
+        ),
+        "nvidia": _registered_real_provider(
+            "nvidia",
+            settings=settings,
+            workspace_id=workspace_id,
+            real_providers_enabled=real_providers_enabled,
+        ),
+        "mock": ProviderModel(
+            provider_slug="mock",
+            provider_name=MOCK_PROVIDER_NAME,
+            model_name=MOCK_MODEL_NAME,
+            state=ProviderState.MOCK,
+            state_reason="development_and_safe_fallback_only",
+            capabilities=("text_chat", "deterministic_preview"),
+            is_real=False,
+        ),
+    }
     return ProviderRegistry(
         providers={
-            "openai": _registered_real_provider(
-                "openai",
-                settings=settings,
-                workspace_id=workspace_id,
-                real_providers_enabled=real_providers_enabled,
-            ),
-            "gemini": _registered_real_provider(
-                "gemini",
-                settings=settings,
-                workspace_id=workspace_id,
-                real_providers_enabled=real_providers_enabled,
-            ),
-            "nvidia": _registered_real_provider(
-                "nvidia",
-                settings=settings,
-                workspace_id=workspace_id,
-                real_providers_enabled=real_providers_enabled,
-            ),
-            "mock": ProviderModel(
-                provider_slug="mock",
-                provider_name=MOCK_PROVIDER_NAME,
-                model_name=MOCK_MODEL_NAME,
-                state=ProviderState.MOCK,
-                state_reason="development_and_safe_fallback_only",
-                capabilities=("text_chat", "deterministic_preview"),
-                is_real=False,
-            ),
+            slug: _apply_workspace_control(provider, controls)
+            for slug, provider in providers.items()
         }
     )

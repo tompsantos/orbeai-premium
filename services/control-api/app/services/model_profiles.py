@@ -18,6 +18,7 @@ class ModelLifecycle(StrEnum):
 class ProfileEvidenceSource(StrEnum):
     CODE_REGISTRY = "code_registry"
     RUNTIME_CONFIGURATION = "runtime_configuration"
+    WORKSPACE_CONFIGURATION = "workspace_configuration"
     PROVIDER_DEFAULT = "provider_default"
     RUNTIME_TELEMETRY = "runtime_telemetry"
     OFFICIAL_DOCUMENTATION = "official_documentation"
@@ -33,9 +34,12 @@ class ModelProfile:
     model_name: str
     lifecycle: ModelLifecycle
     executable: bool
+    workspace_enabled: bool
     provider_state: str
     is_real: bool
     capabilities: tuple[str, ...]
+    required_capabilities: tuple[str, ...]
+    optional_capabilities: tuple[str, ...]
     input_formats: tuple[str, ...]
     output_formats: tuple[str, ...]
     streaming: str
@@ -55,9 +59,12 @@ class ModelProfile:
             "model_name": self.model_name,
             "lifecycle": self.lifecycle.value,
             "executable": self.executable,
+            "workspace_enabled": self.workspace_enabled,
             "provider_state": self.provider_state,
             "is_real": self.is_real,
             "capabilities": list(self.capabilities),
+            "required_capabilities": list(self.required_capabilities),
+            "optional_capabilities": list(self.optional_capabilities),
             "input_formats": list(self.input_formats),
             "output_formats": list(self.output_formats),
             "streaming": self.streaming,
@@ -80,6 +87,12 @@ def _model_evidence_source(provider: ProviderModel) -> ProfileEvidenceSource:
 
 def build_model_profile(provider: ProviderModel) -> ModelProfile:
     lifecycle = ModelLifecycle.EXPERIMENTAL if provider.is_real else ModelLifecycle.MOCK
+    optional_capabilities = tuple(
+        capability for capability in provider.capabilities if capability == "stream_emulation"
+    )
+    required_capabilities = tuple(
+        capability for capability in provider.capabilities if capability not in optional_capabilities
+    )
     streaming = (
         "emulated" if "stream_emulation" in provider.capabilities else "not_implemented"
     )
@@ -93,9 +106,12 @@ def build_model_profile(provider: ProviderModel) -> ModelProfile:
         model_name=provider.model_name,
         lifecycle=lifecycle,
         executable=provider.executable,
+        workspace_enabled=provider.workspace_enabled,
         provider_state=provider.state.value,
         is_real=provider.is_real,
         capabilities=provider.capabilities,
+        required_capabilities=required_capabilities,
+        optional_capabilities=optional_capabilities,
         input_formats=("text",),
         output_formats=("text",),
         streaming=streaming,
@@ -107,6 +123,7 @@ def build_model_profile(provider: ProviderModel) -> ModelProfile:
         evidence_sources={
             "provider": ProfileEvidenceSource.CODE_REGISTRY.value,
             "model": _model_evidence_source(provider).value,
+            "workspace_control": ProfileEvidenceSource.WORKSPACE_CONFIGURATION.value,
             "capabilities": ProfileEvidenceSource.CODE_REGISTRY.value,
             "formats": ProfileEvidenceSource.CODE_REGISTRY.value,
             "streaming": ProfileEvidenceSource.CODE_REGISTRY.value,

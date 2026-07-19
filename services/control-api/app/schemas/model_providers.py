@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ModelProviderRead(BaseModel):
@@ -43,9 +43,12 @@ class ModelProfileRead(BaseModel):
     model_name: str
     lifecycle: str
     executable: bool
+    workspace_enabled: bool
     provider_state: str
     is_real: bool
     capabilities: list[str]
+    required_capabilities: list[str]
+    optional_capabilities: list[str]
     input_formats: list[str]
     output_formats: list[str]
     streaming: str
@@ -56,3 +59,23 @@ class ModelProfileRead(BaseModel):
     validated_at: str | None = None
     evidence_sources: dict[str, str]
     telemetry: ModelTelemetryRead | None = None
+
+
+class WorkspaceModelControlUpdate(BaseModel):
+    provider_slug: str = Field(min_length=1, max_length=80)
+    model_name: str = Field(min_length=1, max_length=120)
+    enabled: bool
+
+
+class WorkspaceModelControlRead(BaseModel):
+    control_version: str
+    control_key: str
+    provider_slug: str
+    provider_name: str
+    model_name: str
+    enabled: bool
+    effective_state: str
+    state_reason: str
+    executable: bool
+    updated_at: str | None = None
+    updated_by: str | None = None

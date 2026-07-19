@@ -42,7 +42,7 @@ def test_router_v1_selects_direct_provider_for_simple_turn(monkeypatch) -> None:
     assert decision.model_name == "openai-test-model"
     assert decision.estimated_latency_ms is None
     assert decision.estimated_cost_usd is None
-    assert decision.execution_plan.provider_chain == ("openai", "gemini", "nvidia", "mock")
+    assert decision.execution_plan.provider_chain == ("openai", "gemini", "mock")
 
 
 def test_router_v1_sends_tool_request_to_cognition(monkeypatch) -> None:
@@ -78,7 +78,7 @@ def test_gateway_retries_chain_and_records_real_fallback(monkeypatch) -> None:
         model_preference="auto",
         cognition_enabled=False,
     )
-    registry = build_provider_registry(settings)
+    registry = build_provider_registry(settings, workspace_model_controls={})
 
     calls: list[str] = []
 
