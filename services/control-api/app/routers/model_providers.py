@@ -1,6 +1,6 @@
 from os import getenv
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -11,6 +11,7 @@ from app.models import ModelRun
 from app.schemas.model_providers import ModelProfileRead, ModelProviderRead
 from app.services.feature_flags import is_feature_enabled
 from app.services.model_profiles import build_model_profiles
+from app.services.model_telemetry import build_model_telemetry_map
 from app.services.provider_registry import ProviderModel, ProviderState, build_provider_registry
 
 router = APIRouter(prefix="/model-providers", tags=["model-providers"])
@@ -69,6 +70,7 @@ def api_key_status(provider: ProviderModel) -> str:
 
 @router.get("/profiles", response_model=list[ModelProfileRead])
 def list_model_profiles(
+    window_days: int = Query(default=30, ge=1, le=90),
     db: Session = Depends(get_db),
     context: CurrentWorkspaceContext = Depends(get_current_workspace_context),
 ) -> list[ModelProfileRead]:
@@ -83,6 +85,7 @@ def list_model_profiles(
             detail="Model profiles are disabled",
         )
 
+    settings = get_settings()
     real_providers_enabled = is_feature_enabled(
         db=db,
         workspace_id=context.workspace_id,
@@ -90,13 +93,25 @@ def list_model_profiles(
         default=True,
     )
     registry = build_provider_registry(
-        get_settings(),
+        settings,
         real_providers_enabled=real_providers_enabled,
         workspace_id=context.workspace_id,
     )
+    profiles = build_model_profiles(registry)
+    telemetry = build_model_telemetry_map(
+        db,
+        workspace_id=context.workspace_id,
+        profiles=profiles,
+        window_days=window_days,
+        settings=settings,
+    )
+
     return [
-        ModelProfileRead(**profile.persisted_payload())
-        for profile in build_model_profiles(registry)
+        ModelProfileRead(
+            **profile.persisted_payload(),
+            telemetry=telemetry[(profile.provider_slug, profile.model_name)].persisted_payload(),
+        )
+        for profile in profiles
     ]
 
 
