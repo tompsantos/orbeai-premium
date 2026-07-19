@@ -52,7 +52,7 @@ def create_gateway_model_run_without_response(
         status=status,
         latency_ms=max(0, latency_ms),
         input_tokens=execution.result.input_tokens,
-        output_tokens=0,
+        output_tokens=execution.result.output_tokens,
         estimated_cost_usd=execution.result.estimated_cost_usd,
         router_reason=decision.reason,
         fallback_chain=decision.fallback_chain,
