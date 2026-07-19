@@ -90,7 +90,10 @@ critério da primeira vitória: cumprido no ambiente integrado. falta consolidar
 - [x] criar perfis operacionais de modelos;
 - [x] coletar telemetria real de latência, sucesso, timeout, tokens e custo;
 - [x] expor telemetria e controles seguros no Laboratório;
-- [ ] validar contexto e política de dados por modelo;
+- [x] validar contexto e política de dados por id exato quando houver fonte oficial;
+- [x] manter modelos e campos desconhecidos como `not_validated`;
+- [ ] associar obrigatoriamente tentativa, mensagem e model run;
+- [ ] definir retenção e agregação da telemetria;
 - [ ] criar dataset versionado de decisões;
 - [ ] criar replay offline;
 - [ ] medir baseline do router v1.
