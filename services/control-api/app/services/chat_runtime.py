@@ -25,7 +25,7 @@ class ChatRuntimeExecution:
     used_legacy_fallback: bool
     knowledge_sources: list[KnowledgeContextSource]
     provider_attempts: list[dict[str, object]]
-    provider_correlation_id: str | None
+    provider_correlation_id: str | None = None
 
 
 def _direct_plan(decision: RouterDecision) -> ExecutionPlan:
@@ -62,12 +62,12 @@ def execute_chat_runtime(
     workspace_id: str,
     user_id: str,
     chat_id: str,
-    user_message_id: str,
     content: str,
     mode: str,
     model_preference: str,
     memory_context: str | None,
     conversation_history: list[dict[str, Any]],
+    user_message_id: str | None = None,
     knowledge_context: str | None = None,
 ) -> ChatRuntimeExecution:
     settings = get_settings()
