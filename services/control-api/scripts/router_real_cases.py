@@ -5,7 +5,6 @@ import os
 from pathlib import Path
 
 from app.db.session import SessionLocal
-from app.services.router_evaluation import RouterEvaluationCase
 from app.services.router_real_cases import (
     RouterRealCaseCandidate,
     RouterRealCaseReview,
