@@ -9,6 +9,7 @@ import {
   Gauge,
   RefreshCw,
   ShieldCheck,
+  ShieldOff,
   TimerReset,
 } from "lucide-react";
 
@@ -21,6 +22,7 @@ import type {
   ModelLifecycle,
   ModelProfile,
   ModelProfileCatalogStatus,
+  WorkspaceModelControl,
 } from "@/types/modelProfiles";
 
 export const Route = createFileRoute("/app/model-profiles")({
@@ -33,6 +35,7 @@ type WindowDays = 7 | 30 | 90;
 type LoadState = {
   status: "loading" | "ready" | "disabled" | "mock" | "error";
   profiles: ModelProfile[];
+  controls: WorkspaceModelControl[] | null;
   error?: string;
 };
 
@@ -90,17 +93,30 @@ function statusDescription(status: ModelProfileCatalogStatus) {
 
 function ModelProfilesPage() {
   const [windowDays, setWindowDays] = useState<WindowDays>(30);
-  const [state, setState] = useState<LoadState>({ status: "loading", profiles: [] });
+  const [updatingKey, setUpdatingKey] = useState<string>();
+  const [controlError, setControlError] = useState<string>();
+  const [state, setState] = useState<LoadState>({
+    status: "loading",
+    profiles: [],
+    controls: null,
+  });
 
   const load = useCallback(async () => {
     setState((current) => ({ ...current, status: "loading", error: undefined }));
+    setControlError(undefined);
     try {
       const catalog = await modelProfileService.catalog(windowDays);
-      setState({ status: catalog.status, profiles: catalog.profiles });
+      if (catalog.status !== "ready") {
+        setState({ status: catalog.status, profiles: [], controls: null });
+        return;
+      }
+      const controls = await modelProfileService.controls();
+      setState({ status: "ready", profiles: catalog.profiles, controls });
     } catch (error) {
       setState({
         status: "error",
         profiles: [],
+        controls: null,
         error: error instanceof Error ? error.message : "Falha ao carregar perfis operacionais.",
       });
     }
@@ -122,12 +138,34 @@ function ModelProfilesPage() {
 
     return {
       executed,
-      successes,
       failures,
       tokens,
       successRate: executed ? successes / executed : undefined,
     };
   }, [state.profiles]);
+
+  const controlsByKey = useMemo(
+    () => new Map((state.controls ?? []).map((control) => [control.controlKey, control])),
+    [state.controls],
+  );
+
+  async function toggleModel(profile: ModelProfile) {
+    const controlKey = `${profile.providerSlug}:${profile.modelName}`;
+    setUpdatingKey(controlKey);
+    setControlError(undefined);
+    try {
+      await modelProfileService.setControl(
+        profile.providerSlug,
+        profile.modelName,
+        !profile.workspaceEnabled,
+      );
+      await load();
+    } catch (error) {
+      setControlError(error instanceof Error ? error.message : "Falha ao atualizar o modelo.");
+    } finally {
+      setUpdatingKey(undefined);
+    }
+  }
 
   return (
     <div className="mx-auto w-full max-w-[1380px] space-y-6">
@@ -157,7 +195,7 @@ function ModelProfilesPage() {
               Perfis de modelos
             </h1>
             <p className="mt-4 max-w-3xl text-base leading-7 text-muted-foreground">
-              Estado, capacidades e telemetria dos modelos realmente registrados no orbeRouter. Campos sem evidência permanecem explicitamente não validados.
+              Estado, capacidades, telemetria e disponibilidade efetiva dos modelos registrados no orbeRouter. Controles de owner e admin são persistidos e obedecidos pela cadeia de execução.
             </p>
           </div>
 
@@ -186,11 +224,23 @@ function ModelProfilesPage() {
         </div>
       </section>
 
+      {controlError && (
+        <section className="rounded-2xl border border-amber-200 bg-amber-50/70 px-5 py-4 text-sm text-amber-900">
+          <div className="flex items-start gap-3">
+            <ShieldOff className="mt-0.5 size-4 shrink-0" />
+            <div>
+              <div className="font-semibold">controle não aplicado</div>
+              <div className="mt-1 text-amber-800">{controlError}</div>
+            </div>
+          </div>
+        </section>
+      )}
+
       {state.status === "loading" && (
         <StateCard
           icon={RefreshCw}
           title="Lendo o catálogo operacional"
-          description="Consultando perfis e telemetria autorizados para este workspace."
+          description="Consultando perfis, controles e telemetria autorizados para este workspace."
           spinning
         />
       )}
@@ -219,7 +269,7 @@ function ModelProfilesPage() {
               icon={Cpu}
               label="modelos registrados"
               value={state.profiles.length.toLocaleString("pt-BR")}
-              detail="somente registry executável"
+              detail={`${state.profiles.filter((item) => item.workspaceEnabled).length} habilitado(s)`}
             />
             <SummaryCard
               icon={Activity}
@@ -241,10 +291,23 @@ function ModelProfilesPage() {
             />
           </section>
 
+          {state.controls === null && (
+            <section className="rounded-2xl border border-border/70 bg-card px-5 py-4 text-sm text-muted-foreground">
+              Os perfis estão em modo somente leitura para sua função neste workspace. Owner e admin podem alterar disponibilidade operacional.
+            </section>
+          )}
+
           {state.profiles.length ? (
             <section className="grid gap-4 xl:grid-cols-2">
               {state.profiles.map((profile) => (
-                <ProfileCard key={profile.profileId} profile={profile} />
+                <ProfileCard
+                  key={profile.profileId}
+                  profile={profile}
+                  control={controlsByKey.get(`${profile.providerSlug}:${profile.modelName}`)}
+                  canManage={state.controls !== null}
+                  updating={updatingKey === `${profile.providerSlug}:${profile.modelName}`}
+                  onToggle={() => void toggleModel(profile)}
+                />
               ))}
             </section>
           ) : (
@@ -260,7 +323,19 @@ function ModelProfilesPage() {
   );
 }
 
-function ProfileCard({ profile }: { profile: ModelProfile }) {
+function ProfileCard({
+  profile,
+  control,
+  canManage,
+  updating,
+  onToggle,
+}: {
+  profile: ModelProfile;
+  control?: WorkspaceModelControl;
+  canManage: boolean;
+  updating: boolean;
+  onToggle: () => void;
+}) {
   const telemetry = profile.telemetry;
   const totalTokens = (telemetry?.inputTokensTotal ?? 0) + (telemetry?.outputTokensTotal ?? 0);
 
@@ -283,7 +358,29 @@ function ProfileCard({ profile }: { profile: ModelProfile }) {
             <div className="mt-1 text-[11px] text-muted-foreground">{profile.profileVersion}</div>
           </div>
         </div>
-        <div className="text-xs text-muted-foreground">última tentativa: {formatDate(telemetry?.lastAttemptAt)}</div>
+
+        <div className="space-y-2 text-right">
+          <div className="text-xs text-muted-foreground">última tentativa: {formatDate(telemetry?.lastAttemptAt)}</div>
+          {canManage && (
+            <button
+              type="button"
+              aria-pressed={profile.workspaceEnabled}
+              disabled={updating}
+              onClick={onToggle}
+              className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-60 ${
+                profile.workspaceEnabled
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                  : "border-slate-200 bg-slate-50 text-slate-600"
+              }`}
+            >
+              {updating ? <RefreshCw className="size-3.5 animate-spin" /> : profile.workspaceEnabled ? <ShieldCheck className="size-3.5" /> : <ShieldOff className="size-3.5" />}
+              {profile.workspaceEnabled ? "habilitado no workspace" : "desativado no workspace"}
+            </button>
+          )}
+          {control?.updatedAt && (
+            <div className="text-[10px] text-muted-foreground">alterado em {formatDate(control.updatedAt)}</div>
+          )}
+        </div>
       </div>
 
       <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -313,23 +410,18 @@ function ProfileCard({ profile }: { profile: ModelProfile }) {
 
       <div className="mt-5 border-t border-border/70 pt-5">
         <div className="grid gap-4 md:grid-cols-2">
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">capacidades declaradas</div>
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {profile.capabilities.map((capability) => (
-                <Pill key={capability} tone="muted">{capability}</Pill>
-              ))}
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <InfoBlock label="streaming" value={profile.streaming} />
-            <InfoBlock label="ferramentas" value={profile.toolSupport} />
-            <InfoBlock
-              label="contexto"
-              value={profile.contextWindowTokens ? profile.contextWindowTokens.toLocaleString("pt-BR") : "não validado"}
-            />
-            <InfoBlock label="política de dados" value={profile.dataPolicy.replaceAll("_", " ")} />
-          </div>
+          <CapabilityGroup title="capacidades obrigatórias" values={profile.requiredCapabilities} />
+          <CapabilityGroup title="capacidades opcionais" values={profile.optionalCapabilities} />
+        </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+          <InfoBlock label="streaming" value={profile.streaming} />
+          <InfoBlock label="ferramentas" value={profile.toolSupport} />
+          <InfoBlock
+            label="contexto"
+            value={profile.contextWindowTokens ? profile.contextWindowTokens.toLocaleString("pt-BR") : "não validado"}
+          />
+          <InfoBlock label="política de dados" value={profile.dataPolicy.replaceAll("_", " ")} />
         </div>
 
         <details className="group mt-4 rounded-xl border border-border/60 bg-muted/20 p-3.5">
@@ -348,6 +440,19 @@ function ProfileCard({ profile }: { profile: ModelProfile }) {
         </details>
       </div>
     </article>
+  );
+}
+
+function CapabilityGroup({ title, values }: { title: string; values: string[] }) {
+  return (
+    <div>
+      <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">{title}</div>
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {values.length ? values.map((capability) => (
+          <Pill key={capability} tone="muted">{capability}</Pill>
+        )) : <span className="text-xs text-muted-foreground">nenhuma declarada</span>}
+      </div>
+    </div>
   );
 }
 
