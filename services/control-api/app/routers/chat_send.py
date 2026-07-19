@@ -15,6 +15,11 @@ from app.services.chat_runtime import execute_chat_runtime
 from app.services.feature_flags import is_feature_enabled
 from app.services.memory_context import build_memory_context, select_relevant_memories
 from app.services.orbe_router import resolve_chat_route
+from app.services.provider_execution_tracking import (
+    associate_successful_gateway_execution,
+    create_failed_gateway_model_run,
+)
+from app.services.provider_gateway import ProviderGatewayError
 from app.services.workspace_policies import get_workspace_policy, memory_context_limit
 from app.services.workspace_settings import get_or_create_workspace_settings
 
@@ -213,18 +218,62 @@ def send_chat_message(
         if message.role in {"user", "assistant", "system"}
     ]
 
-    runtime_execution = execute_chat_runtime(
-        decision=decision,
-        real_providers_enabled=real_providers_enabled,
-        workspace_id=chat.workspace_id,
-        user_id=context.user_id,
-        chat_id=chat.id,
-        content=payload.content,
-        mode=chat.mode,
-        model_preference=chat.model_preference,
-        memory_context=memory_context,
-        conversation_history=conversation_history,
-    )
+    try:
+        runtime_execution = execute_chat_runtime(
+            decision=decision,
+            real_providers_enabled=real_providers_enabled,
+            workspace_id=chat.workspace_id,
+            user_id=context.user_id,
+            chat_id=chat.id,
+            user_message_id=user_message.id,
+            content=payload.content,
+            mode=chat.mode,
+            model_preference=chat.model_preference,
+            memory_context=memory_context,
+            conversation_history=conversation_history,
+        )
+    except ProviderGatewayError as exc:
+        latency_ms = int((perf_counter() - started_at) * 1000)
+        model_run, associated_attempt_count = create_failed_gateway_model_run(
+            db,
+            workspace_id=chat.workspace_id,
+            chat_id=chat.id,
+            message_id=user_message.id,
+            task_type="chat.send",
+            latency_ms=latency_ms,
+            decision=decision,
+            error=exc,
+        )
+        user_message.meta = {
+            **(user_message.meta or {}),
+            "provider_correlation_id": exc.correlation_id,
+            "model_run_id": model_run.id,
+            "run_status": "failed",
+        }
+        db.add(user_message)
+        write_audit_log(
+            db=db,
+            workspace_id=chat.workspace_id,
+            action="chat.send.failed",
+            resource_type="chat",
+            resource_id=chat.id,
+            request_id=exc.correlation_id,
+            meta={
+                "message_id": user_message.id,
+                "model_run_id": model_run.id,
+                "attempt_count": len(exc.attempts),
+                "associated_attempt_count": associated_attempt_count,
+                "router_decision": decision.persisted_payload(),
+                "auth_user_id": context.user_id,
+                "membership_role": context.role,
+            },
+        )
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="nenhum provider disponível conseguiu concluir a solicitação",
+        ) from exc
+
     result = runtime_execution.result
     selected_provider_slug = runtime_execution.selected_provider_slug
     provider_error = runtime_execution.provider_error
@@ -248,6 +297,7 @@ def send_chat_message(
             or runtime_execution.used_legacy_fallback,
             "router_decision": decision_payload,
             "provider_attempts": runtime_execution.provider_attempts,
+            "provider_correlation_id": runtime_execution.provider_correlation_id,
             "runtime": runtime_execution.runtime_name,
             "provider_error": provider_error,
             "cognition_error": cognition_error,
@@ -290,6 +340,14 @@ def send_chat_message(
     )
     db.add(model_run)
     db.flush()
+    associated_attempt_count = associate_successful_gateway_execution(
+        db,
+        workspace_id=chat.workspace_id,
+        chat_id=chat.id,
+        message_id=assistant_message.id,
+        model_run_id=model_run.id,
+        correlation_id=runtime_execution.provider_correlation_id,
+    )
 
     write_audit_log(
         db=db,
@@ -297,6 +355,7 @@ def send_chat_message(
         action="chat.send",
         resource_type="chat",
         resource_id=chat.id,
+        request_id=runtime_execution.provider_correlation_id,
         meta={
             "message_id": assistant_message.id,
             "model_run_id": model_run.id,
@@ -307,6 +366,7 @@ def send_chat_message(
             "latency_ms": latency_ms,
             "router_decision": decision_payload,
             "provider_attempts": runtime_execution.provider_attempts,
+            "associated_attempt_count": associated_attempt_count,
             "memory_context_count": len(relevant_memories),
             "memory_event_count": len(memory_events),
             "provider_error": provider_error,
