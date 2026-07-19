@@ -1,0 +1,38 @@
+{
+  "gate_version": "router-evaluation-exit-gate-v1",
+  "standard": {
+    "minimum_cases": 28,
+    "minimum_categories": 17,
+    "maximum_failed_cases": 0
+  },
+  "boundaries": {
+    "minimum_cases": 20,
+    "minimum_categories": 8,
+    "maximum_failed_cases": 0
+  },
+  "execution": {
+    "minimum_cases": 20,
+    "minimum_pairs": 10,
+    "minimum_pair_categories": 5,
+    "minimum_separated_pairs": 7,
+    "maximum_failed_cases": 0,
+    "maximum_failed_pairs": 0
+  },
+  "real_cases": {
+    "minimum_cases": 12,
+    "maximum_failed_cases": 0,
+    "required_categories": {
+      "conversation": 2,
+      "software": 2,
+      "document": 2,
+      "research": 2,
+      "risk-sensitivity": 2,
+      "execution-boundary": 2
+    }
+  },
+  "accepted_known_findings": {
+    "github-language": "both_cognition",
+    "terminal-language": "both_cognition",
+    "deploy-language": "both_cognition"
+  }
+}
