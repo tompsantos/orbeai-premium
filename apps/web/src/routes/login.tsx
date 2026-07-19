@@ -1,15 +1,12 @@
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowRight, LockKeyhole, ShieldCheck, Sparkles } from "lucide-react";
 
 import { OrbeMark, OrbeWordmark } from "@/components/design-system/OrbeLogo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
-import { login, register } from "@/lib/auth/authService";
+import { login } from "@/lib/auth/authService";
 import { getStoredAuthUser } from "@/lib/auth/session";
-
-type AuthMode = "login" | "register";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -28,26 +25,10 @@ function LoginRoute() {
   const navigate = useNavigate();
   const storedUser = getStoredAuthUser();
 
-  const [mode, setMode] = useState<AuthMode>("login");
-  const [name, setName] = useState(storedUser?.name ?? "Tom");
-  const [email, setEmail] = useState(storedUser?.email ?? "tom@orbeone.dev");
-  const [password, setPassword] = useState("orbeai-dev-123456");
+  const [email, setEmail] = useState(storedUser?.email ?? "");
+  const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const title = mode === "login" ? "entrar na orbeAI" : "criar acesso";
-  const subtitle =
-    mode === "login"
-      ? "continue para o cockpit cognitivo da orbeOne."
-      : "crie o primeiro acesso e entre no workspace orbeOne.";
-
-  const submitLabel = useMemo(() => {
-    if (submitting) {
-      return mode === "login" ? "entrando..." : "criando acesso...";
-    }
-
-    return mode === "login" ? "entrar" : "criar acesso";
-  }, [mode, submitting]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -55,20 +36,13 @@ function LoginRoute() {
     setSubmitting(true);
 
     try {
-      if (mode === "login") {
-        await login({ email, password });
-      } else {
-        await register({ email, name, password });
-      }
-
+      await login({ email, password });
       await navigate({ to: "/app" });
     } catch (err) {
       const message = err instanceof Error ? err.message : "não foi possível autenticar.";
 
-      if (mode === "login" && message.toLowerCase().includes("invalid")) {
+      if (message.toLowerCase().includes("invalid")) {
         setError("email ou senha inválidos.");
-      } else if (mode === "register" && message.toLowerCase().includes("registered")) {
-        setError("esse email já está cadastrado. tenta entrar.");
       } else {
         setError(message);
       }
@@ -98,7 +72,7 @@ function LoginRoute() {
         <div className="hidden lg:block">
           <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-card/60 px-3 py-1.5 text-xs font-medium text-muted-foreground">
             <Sparkles className="size-3.5 text-[var(--orbe-blue)]" />
-            orbeOne · auth foundation
+            orbeOne · acesso protegido
           </div>
 
           <h1 className="mt-6 max-w-2xl text-5xl font-semibold tracking-tight">
@@ -106,15 +80,14 @@ function LoginRoute() {
           </h1>
 
           <p className="mt-5 max-w-xl text-muted-foreground leading-relaxed">
-            A orbeAI agora usa usuário, sessão real, token opaco e workspace autenticado.
-            O app deixou a porta aberta do laboratório e ganhou recepção premium.
+            A orbeAI usa usuário, sessão real, token opaco e workspace autenticado. Novos acessos são provisionados de forma controlada pela administração.
           </p>
 
           <div className="mt-8 grid max-w-xl gap-3">
             {[
               "token opaco com hash no backend",
               "workspace resolvido pela membership",
-              "rotas principais protegidas",
+              "cadastro público desabilitado",
             ].map((item) => (
               <div key={item} className="orbe-card flex items-center gap-3 p-4">
                 <div className="flex size-9 items-center justify-center rounded-xl bg-[var(--orbe-blue)]/10 text-[var(--orbe-blue)]">
@@ -135,8 +108,10 @@ function LoginRoute() {
                     <OrbeMark size={24} />
                   </div>
 
-                  <h2 className="text-2xl font-semibold tracking-tight">{title}</h2>
-                  <p className="mt-1.5 text-sm text-muted-foreground">{subtitle}</p>
+                  <h2 className="text-2xl font-semibold tracking-tight">entrar na orbeAI</h2>
+                  <p className="mt-1.5 text-sm text-muted-foreground">
+                    continue para o cockpit cognitivo da orbeOne.
+                  </p>
                 </div>
 
                 <div className="rounded-full border border-border/70 bg-background/70 p-2 text-muted-foreground">
@@ -144,53 +119,7 @@ function LoginRoute() {
                 </div>
               </div>
 
-              <div className="mb-5 grid grid-cols-2 rounded-xl bg-muted/60 p-1 text-sm">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode("login");
-                    setError(null);
-                  }}
-                  className={cn(
-                    "rounded-lg px-3 py-2 font-medium transition",
-                    mode === "login" ? "bg-background shadow-sm" : "text-muted-foreground",
-                  )}
-                >
-                  entrar
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode("register");
-                    setError(null);
-                  }}
-                  className={cn(
-                    "rounded-lg px-3 py-2 font-medium transition",
-                    mode === "register" ? "bg-background shadow-sm" : "text-muted-foreground",
-                  )}
-                >
-                  cadastrar
-                </button>
-              </div>
-
               <form onSubmit={handleSubmit} className="space-y-4">
-                {mode === "register" && (
-                  <div className="space-y-1.5">
-                    <label htmlFor="name" className="text-sm font-medium">
-                      nome
-                    </label>
-                    <Input
-                      id="name"
-                      value={name}
-                      onChange={(event) => setName(event.target.value)}
-                      autoComplete="name"
-                      minLength={2}
-                      required
-                    />
-                  </div>
-                )}
-
                 <div className="space-y-1.5">
                   <label htmlFor="email" className="text-sm font-medium">
                     email
@@ -214,9 +143,8 @@ function LoginRoute() {
                     id="password"
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
-                    autoComplete={mode === "login" ? "current-password" : "new-password"}
+                    autoComplete="current-password"
                     type="password"
-                    minLength={mode === "register" ? 8 : 1}
                     required
                   />
                 </div>
@@ -228,13 +156,13 @@ function LoginRoute() {
                 )}
 
                 <Button type="submit" className="w-full" disabled={submitting}>
-                  {submitLabel}
+                  {submitting ? "entrando..." : "entrar"}
                   <ArrowRight className="ml-1 size-4" />
                 </Button>
               </form>
 
               <p className="mt-5 text-center text-xs text-muted-foreground">
-                dev local: pode usar <span className="font-medium">tom@orbeone.dev</span> com a senha configurada no .env.local.
+                acesso restrito a contas previamente provisionadas.
               </p>
             </div>
           </div>

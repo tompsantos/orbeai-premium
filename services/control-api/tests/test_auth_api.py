@@ -2,6 +2,7 @@ from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
+from app.core.config import get_settings
 from app.main import app
 
 client = TestClient(app)
@@ -27,7 +28,6 @@ def register_and_get_token() -> tuple[str, dict]:
     response = client.post("/v1/auth/register", json=register_payload())
 
     assert response.status_code == 201
-
     data = response.json()
 
     return data["access_token"], data
@@ -54,6 +54,23 @@ def test_auth_openapi_paths_are_registered() -> None:
             failures.append(f"{path}: missing {missing}; registered {sorted(registered)}")
 
     assert failures == []
+
+
+def test_register_is_blocked_when_public_registration_is_disabled() -> None:
+    settings = get_settings().model_copy(update={"public_registration_enabled": False})
+    app.dependency_overrides[get_settings] = lambda: settings
+    email = unique_email()
+
+    response = client.post("/v1/auth/register", json=register_payload(email))
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Public registration is disabled"}
+
+    login = client.post(
+        "/v1/auth/login",
+        json={"email": email, "password": "senha-segura-123"},
+    )
+    assert login.status_code == 401
 
 
 def test_register_returns_token_and_user_without_password() -> None:

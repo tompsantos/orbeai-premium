@@ -4,6 +4,7 @@ from datetime import timedelta
 import pytest
 from sqlalchemy import select
 
+from app.core.config import get_settings
 from app.db.session import SessionLocal
 from app.dependencies.auth import AuthContext, get_current_auth_context
 from app.dependencies.workspace import CurrentWorkspaceContext, get_current_workspace_context
@@ -50,7 +51,6 @@ def reset_runtime_state() -> None:
             setattr(settings, field, value)
 
         ensure_default_flags(db, workspace.id)
-
         flags = db.scalars(
             select(FeatureFlag).where(FeatureFlag.workspace_id == workspace.id)
         ).all()
@@ -114,7 +114,6 @@ def fake_workspace_context() -> CurrentWorkspaceContext:
         workspace = get_or_create_default_workspace(db)
         auth = fake_auth_context()
         now = __import__("app.models.core", fromlist=["utc_now"]).utc_now()
-
         membership = WorkspaceMember(
             id="wm_pytest_auth",
             workspace_id=workspace.id,
@@ -132,6 +131,16 @@ def fake_workspace_context() -> CurrentWorkspaceContext:
         )
     finally:
         db.close()
+
+
+@pytest.fixture(autouse=True)
+def public_registration_enabled_for_tests() -> Generator[None, None, None]:
+    settings = get_settings().model_copy(update={"public_registration_enabled": True})
+    app.dependency_overrides[get_settings] = lambda: settings
+
+    yield
+
+    app.dependency_overrides.pop(get_settings, None)
 
 
 @pytest.fixture(autouse=True)
