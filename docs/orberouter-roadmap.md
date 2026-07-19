@@ -19,14 +19,15 @@ Uma fase não termina apenas porque existe código. Quando aplicável, deve have
 ## marco atual
 
 - data de referência: 2026-07-19;
-- commit oficial de referência: `7917adca0a6ecc2b5e1c2e1dd383dad4907c8bf8`;
+- commit oficial de referência: `d936409caa12faab9c41423fae2dd7722e4f875c`;
 - kernel atual: `orbe-router-v1`;
 - aplicação ativa: `ai.orbeone.com.br`;
 - providers reais validados: OpenAI, Gemini e NVIDIA NIM;
 - cadastro público: fechado no código e validado na CI; publicação no ambiente rastreada separadamente;
 - fase 2: concluída no escopo de desenvolvimento do GitHub;
 - fase 3: concluída com CI verde e merge do PR #26;
-- próxima fase técnica: fase 4, perfis operacionais e telemetria antes de dataset e scoring inteligente.
+- fase 4: em andamento com contrato versionado de perfis operacionais atrás de feature flag;
+- próxima fatia técnica: telemetria real por provider e modelo antes de dataset e scoring inteligente.
 
 ## fase 0. fundação arquitetural
 
@@ -149,17 +150,19 @@ critério de saída: qualquer novo chat consegue retomar o projeto sem reconstru
 
 ## fase 4. inventário e perfis operacionais de modelos
 
-status: não iniciada.
+status: em andamento.
 
 ### contrato
 
-- [ ] definir `ModelProfile` versionado;
-- [ ] separar provider de modelo;
+- [x] definir `ModelProfile` versionado;
+- [x] separar provider de modelo no contrato de perfil;
 - [ ] registrar capacidades obrigatórias e opcionais;
-- [ ] registrar formatos, streaming e ferramentas;
+- [x] registrar formatos, streaming e estado de ferramentas;
 - [ ] registrar contexto validado;
 - [ ] registrar política de dados;
-- [ ] registrar estado experimental, aprovado ou descontinuado.
+- [x] registrar estado experimental, aprovado, descontinuado ou mock;
+- [x] criar feature flag `router_model_profiles` desligada por padrão;
+- [x] documentar campos desconhecidos como `not_validated`.
 
 ### telemetria
 
@@ -167,14 +170,16 @@ status: não iniciada.
 - [ ] coletar taxa de sucesso e timeout;
 - [ ] coletar tokens quando disponíveis;
 - [ ] calcular custo apenas com tabela configurada;
-- [ ] identificar fonte de cada dado;
+- [x] identificar fonte prevista de cada dado no contrato;
 - [ ] criar janela e retenção de métricas.
 
 ### interface e operação
 
+- [x] expor endpoint interno seguro de perfis atrás de feature flag;
 - [ ] mostrar perfil seguro no Laboratório;
 - [ ] permitir ativar ou desativar modelo por workspace;
-- [ ] não expor segredo ou payload bruto.
+- [x] não expor segredo, hint de chave, ciphertext ou payload bruto;
+- [x] excluir placeholders sem adapter do catálogo operacional.
 
 critério de saída: router possui catálogo operacional real, sem números cenográficos.
 
@@ -370,3 +375,4 @@ Adicionar novas decisões nesta tabela e criar ADR quando exigido.
 | 2026-07-19 | router será evoluído no github, validado na CI e só depois publicado | aceito | ADR 0003 |
 | 2026-07-19 | semântica nova começa em shadow mode | aceito | ADR 0003 |
 | 2026-07-19 | fase 2 de desenvolvimento encerrada no GitHub; rollout da center e ACL permanecem operacionais | aceito | `docs/phase-2-security-closure.md` |
+| 2026-07-19 | perfis de modelos começam como catálogo versionado, sem participar do scoring | em implementação | `docs/model-profiles.md` |
