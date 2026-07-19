@@ -3,7 +3,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.models import Chat, Message, ModelRun, Project
+from app.models import Chat, Message, ModelRun, Project, ProviderAttemptRecord
 from app.schemas.chats import ChatCreate, ChatRead, ChatUpdate
 from app.services.audit import write_audit_log
 from app.services.bootstrap import get_or_create_default_workspace
@@ -59,9 +59,7 @@ def list_chats(
     if project_id is not None:
         statement = statement.where(Chat.project_id == project_id)
 
-    result = db.scalars(
-        statement.order_by(Chat.updated_at.desc())
-    )
+    result = db.scalars(statement.order_by(Chat.updated_at.desc()))
 
     return list(result)
 
@@ -127,6 +125,7 @@ def delete_chat(chat_id: str, db: Session = Depends(get_db)) -> None:
 
     workspace_id = chat.workspace_id
 
+    db.execute(delete(ProviderAttemptRecord).where(ProviderAttemptRecord.chat_id == chat_id))
     db.execute(delete(ModelRun).where(ModelRun.chat_id == chat_id))
     db.execute(delete(Message).where(Message.chat_id == chat_id))
     db.delete(chat)
