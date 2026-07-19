@@ -19,15 +19,15 @@ Uma fase não termina apenas porque existe código. Quando aplicável, deve have
 ## marco atual
 
 - data de referência: 2026-07-19;
-- commit oficial de referência: `dd06189d505ac81a496d1a5c4cd18707a182900c`;
+- commit oficial de referência: `0abf98db3264e546fe43b6e6fa985739835ceed0`;
 - kernel atual: `orbe-router-v1`;
 - aplicação ativa: `ai.orbeone.com.br`;
 - providers reais validados: OpenAI, Gemini e NVIDIA NIM;
 - cadastro público: fechado no código e validado na CI; publicação no ambiente rastreada separadamente;
 - fase 2: concluída no escopo de desenvolvimento do GitHub;
 - fase 3: concluída com CI verde e merge do PR #26;
-- fase 4: em andamento com perfis versionados, telemetria real e interface segura atrás de feature flag;
-- próxima fatia técnica: governança persistente por workspace e fechamento do contrato de capacidades.
+- fase 4: em andamento com perfis, telemetria, interface e governança operacional por workspace;
+- próxima fatia técnica: validar contexto e política de dados por modelo usando fontes oficiais, sem transformar ausência de evidência em capacidade declarada.
 
 ## fase 0. fundação arquitetural
 
@@ -156,13 +156,26 @@ status: em andamento.
 
 - [x] definir `ModelProfile` versionado;
 - [x] separar provider de modelo no contrato de perfil;
-- [ ] registrar capacidades obrigatórias e opcionais;
+- [x] registrar capacidades obrigatórias e opcionais;
 - [x] registrar formatos, streaming e estado de ferramentas;
 - [ ] registrar contexto validado;
 - [ ] registrar política de dados;
 - [x] registrar estado experimental, aprovado, descontinuado ou mock;
 - [x] criar feature flag `router_model_profiles` desligada por padrão;
-- [x] documentar campos desconhecidos como `not_validated`.
+- [x] documentar campos desconhecidos como `not_validated`;
+- [x] registrar disponibilidade efetiva por workspace no perfil.
+
+### governança operacional por workspace
+
+- [x] criar contrato `workspace-model-controls-v1`;
+- [x] persistir controle por provider e nome exato do modelo;
+- [x] proteger metadata reservada contra alteração genérica;
+- [x] restringir leitura e alteração dos controles a owner e admin;
+- [x] auditar alterações com `model.control.update`;
+- [x] rejeitar referência a modelo stale;
+- [x] remover modelo desativado da cadeia antes da decisão;
+- [x] impedir que o workspace fique sem nenhum modelo executável;
+- [x] manter governança operacional separada das políticas completas da fase 6.
 
 ### persistência de tentativas
 
@@ -193,8 +206,10 @@ status: em andamento.
 - [x] mostrar perfil seguro no Laboratório em rota interna própria;
 - [x] permitir janelas de 7, 30 e 90 dias na interface;
 - [x] diferenciar recurso desativado, modo mock e erro real;
-- [ ] permitir ativar ou desativar modelo por workspace;
-- [ ] remover ou substituir controles locais provisórios da tela antiga;
+- [x] permitir owner e admin ativar ou desativar modelo por workspace;
+- [x] manter demais membros em modo somente leitura;
+- [x] remover controles locais provisórios da tela antiga;
+- [x] remover decisão simulada e números cenográficos do frontend;
 - [x] não expor segredo, hint de chave, ciphertext, erro bruto ou payload bruto;
 - [x] excluir placeholders sem adapter do catálogo operacional.
 
@@ -394,4 +409,5 @@ Adicionar novas decisões nesta tabela e criar ADR quando exigido.
 | 2026-07-19 | fase 2 de desenvolvimento encerrada no GitHub; rollout da center e ACL permanecem operacionais | aceito | `docs/phase-2-security-closure.md` |
 | 2026-07-19 | perfis de modelos começam como catálogo versionado, sem participar do scoring | fundido | PR #28 |
 | 2026-07-19 | confiabilidade e latência usam tentativas persistidas; tokens e custo usam model runs | fundido | PR #29 |
-| 2026-07-19 | interface de perfis permanece somente leitura até existir enforcement por workspace | em implementação | `docs/model-profiles.md` |
+| 2026-07-19 | interface de perfis permanece somente leitura até existir enforcement por workspace | superado pela governança real | PR #30 e `docs/model-profiles.md` |
+| 2026-07-19 | disponibilidade de modelo por workspace é versionada, auditada e aplicada antes da provider chain | em implementação | `docs/model-profiles.md` |
