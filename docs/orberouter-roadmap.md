@@ -13,7 +13,8 @@ Legenda: `[x]` comprovado, `[ ]` pendente. Código, CI e ambiente devem ser sepa
 - fase 2: desenvolvimento concluído, rollout da center pendente;
 - fase 3: concluída;
 - fase 4: concluída no PR #33 com perfis, telemetria, governança, correlação e retenção;
-- próxima fase: dataset, replay offline e baseline reproduzível.
+- fase 5: em andamento com dataset sintético, replay e baseline v1;
+- próxima fatia: casos reais sanitizados e ampliação das fronteiras direto versus cognition.
 
 ## fase 0. fundação arquitetural
 
@@ -134,15 +135,43 @@ fechamento: `docs/phase-4-closure.md`.
 
 ## fase 5. dataset e baseline
 
-status: próxima fase.
+status: em andamento.
 
-- [ ] schema versionado do caso de roteamento;
-- [ ] dataset sintético e casos reais sanitizados;
-- [ ] conversa, escrita, código, documento, pesquisa e estratégia;
-- [ ] risco, sensibilidade, memória, conhecimento e cognition;
-- [ ] seleção manual, indisponibilidade e rotas proibidas;
-- [ ] replay offline;
-- [ ] baseline reproduzível do router v1.
+### contrato e replay sintético
+
+- [x] schema `router-case-v1`;
+- [x] dataset JSONL versionado;
+- [x] ids únicos e campos extras rejeitados;
+- [x] rotas aceitáveis e proibidas;
+- [x] providers, reason codes, capabilities, fallback e classificação;
+- [x] ambiente sintético de disponibilidade sem credencial ou chamada;
+- [x] replay `router-replay-v1` usando o kernel real;
+- [x] comando reproduzível e código de saída para CI.
+
+### cobertura inicial
+
+- [x] conversa, escrita, código, documento, pesquisa e estratégia;
+- [x] governo, risco e sensibilidade;
+- [x] memória, conhecimento e contexto combinado;
+- [x] seleção manual e modelo não suportado;
+- [x] custo, rapidez, cognition ativo e desativado;
+- [x] indisponibilidade, fallback e mock;
+- [x] 28 casos em 17 categorias.
+
+### baseline
+
+- [x] `router-baseline-v1`;
+- [x] hash SHA-256 do dataset;
+- [x] placar por categoria e distribuição;
+- [x] retrato por caso protegido pela suíte;
+- [x] 28 de 28 casos aprovados na CI;
+- [x] baseline sintético reproduzível do router v1;
+- [ ] adicionar casos reais sanitizados;
+- [ ] cobrir entradas longas e fronteiras ambíguas;
+- [ ] ampliar direto versus cognition;
+- [ ] definir critério quantitativo de saída da fase 5.
+
+Documentação: `docs/router-evaluation.md`.
 
 ## fase 6. políticas e hard gates
 
@@ -247,4 +276,5 @@ status: não iniciada.
 - PR #30: interface segura de perfis;
 - PR #31: governança operacional por workspace;
 - PR #32: metadados oficiais por id exato;
-- PR #33: correlação obrigatória, falhas terminais e retenção auditada.
+- PR #33: correlação obrigatória, falhas terminais e retenção auditada;
+- PR #34: dataset sintético, replay offline e baseline v1.
