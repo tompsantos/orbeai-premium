@@ -2,7 +2,9 @@
 
 > fonte operacional da orbeAI premium. decisões arquiteturais aceitas e o estado real do código prevalecem sobre planos históricos importados.
 
-## era 0 — fundação
+O plano detalhado do router vive em `docs/orberouter-roadmap.md`. O manual de arquitetura, desenvolvimento, avaliação, publicação e retomada de contexto vive em `docs/orberouter-manual.md`.
+
+## era 0 - fundação
 
 status: concluída.
 
@@ -12,7 +14,7 @@ status: concluída.
 - [x] CI real nos jobs `control-api`, `cognition` e `web`;
 - [x] runner dedicado `orbeone-lab-01`.
 
-## era 1 — identidade e primeira volta do produto
+## era 1 - identidade e primeira volta do produto
 
 status: concluída o suficiente para avançar.
 
@@ -22,13 +24,13 @@ status: concluída o suficiente para avançar.
 - [x] persistência de mensagens, model runs, memória e artifacts;
 - [ ] pendências visuais e de nomenclatura permanecem não bloqueantes.
 
-## era 2 — orbeRouter
+## era 2 - orbeRouter
 
-status: em construção.
+status: primeira vitória real concluída; evolução orientada por evidência em construção.
 
 objetivo: tornar o orbeRouter o córtex executivo da orbeAI. ele decide a estratégia de execução; o Hermes, dentro do `orbe cognition core`, executa loops cognitivos somente quando escolhido.
 
-### bloco 2a — kernel e contratos
+### bloco 2a - kernel e contratos
 
 - [x] definir `RouterRequest`, `SemanticClassification`, `RouterDecision` e `ExecutionPlan`;
 - [x] criar registry de capacidades;
@@ -37,17 +39,19 @@ objetivo: tornar o orbeRouter o córtex executivo da orbeAI. ele decide a estrat
 - [x] definir reason codes estáveis;
 - [x] manter ponte reversível por feature flag `orbe_router_v1`.
 
-### bloco 2b — provider registry e gateway
+### bloco 2b - provider registry e gateway
 
-- [x] registrar apenas adapters diretos realmente existentes: OpenAI, Gemini e mock;
+- [x] registrar adapters diretos de OpenAI, Gemini, NVIDIA NIM e mock declarado;
 - [x] distinguir `configured`, `unavailable`, `disabled` e `mock`;
 - [x] remover latência, custo e qualidade cenográficos da decisão operacional;
 - [x] tornar provider sem adapter um erro explícito;
 - [x] registrar tentativas, retry e fallback;
-- [ ] validar provider real e credencial disponível na bancada sem expor segredo;
+- [x] validar credenciais reais pela interface sem expor segredo;
+- [x] validar OpenAI, Gemini e NVIDIA NIM;
+- [ ] adicionar perfis operacionais versionados por modelo;
 - [ ] adicionar health probes e circuit breaker orientados por métricas reais.
 
-### bloco 2c — primeira fatia vertical real
+### bloco 2c - primeira fatia vertical real
 
 - [x] conectar `POST /v1/chat/live` ao contrato do router v1;
 - [x] persistir a decisão antes da execução;
@@ -55,12 +59,12 @@ objetivo: tornar o orbeRouter o córtex executivo da orbeAI. ele decide a estrat
 - [x] escolher execução direta ou cognition;
 - [x] persistir provider, modelo, tentativas, fallback, latência e model run;
 - [x] manter o frontend no mesmo fluxo vivo;
-- [ ] provar em ambiente integrado uma resposta de provider real enviada pela interface;
-- [ ] registrar a evidência do teste real com ids sanitizados.
+- [x] provar em ambiente integrado respostas de providers reais enviadas pela interface;
+- [ ] registrar evidência técnica do teste real com ids sanitizados.
 
-critério de conclusão: mensagem enviada pelo frontend retorna resposta de modelo real e permite provar decisão, provider, modelo, motivo, fallback, latência, model run e mensagem correspondente.
+critério da primeira vitória: cumprido no ambiente integrado. falta consolidar a evidência sanitizada no repositório.
 
-### bloco 2d — integração formal com cognition
+### bloco 2d - integração formal com cognition
 
 - [x] cognition deixa de ser caminho automático para toda mensagem;
 - [x] fallback direto continua permitido apenas antes de deltas cognitivos;
@@ -69,27 +73,62 @@ critério de conclusão: mensagem enviada pelo frontend retorna resposta de mode
 - [ ] declarar capacidades de ferramentas autorizadas no plano;
 - [ ] criar dataset de decisão direta versus cognitiva.
 
-### bloco 2e — semântica, políticas e avaliação
+### bloco 2e - segurança e fechamento operacional
+
+- [x] fechar cadastro público no código por padrão;
+- [x] remover formulário público de cadastro;
+- [x] remover credenciais de desenvolvimento preenchidas na tela;
+- [x] validar PR #25 na CI e fundir no `main`;
+- [ ] publicar a release do PR #25 no ambiente;
+- [ ] validar endpoint de registro bloqueado no ambiente;
+- [ ] restaurar ACL restritiva e validar conectividade.
+
+### bloco 2f - perfis, dataset e baseline
+
+- [ ] criar perfis operacionais de modelos;
+- [ ] coletar telemetria real de latência, sucesso, timeout, tokens e custo;
+- [ ] criar dataset versionado de decisões;
+- [ ] criar replay offline;
+- [ ] medir baseline do router v1.
+
+### bloco 2g - políticas e scoring v2
+
+- [ ] orçamento, permissões e políticas por workspace;
+- [ ] geração de candidatos;
+- [ ] score explicável e versionado;
+- [ ] persistência dos componentes do score;
+- [ ] feature flag e rollback.
+
+### bloco 2h - semântica e shadow mode
 
 - [x] classificação inicial de intenção, domínio, complexidade, risco e sensibilidade;
-- [ ] adapter opcional de roteamento semântico por feature flag;
-- [ ] shadow mode e comparação offline;
-- [ ] orçamento, permissões e políticas por workspace;
-- [ ] datasets, métricas, explicabilidade e rollback medido;
-- [ ] experimento de conselho de modelos sem dependência estrutural prematura.
+- [ ] avaliar Semantic Router, RouteLLM, LiteLLM, LangGraph, Temporal e alternativas;
+- [ ] criar adapter opcional de roteamento semântico;
+- [ ] executar candidato em shadow mode;
+- [ ] comparar offline e medir calibração;
+- [ ] ativar somente após ganho comprovado.
 
-## era 3 — orbe-memory
+### bloco 2i - saúde, avaliação e rollout
+
+- [ ] circuit breaker;
+- [ ] métricas de decisão e execução;
+- [ ] explicabilidade segura;
+- [ ] rollout por workspace e porcentagem;
+- [ ] rollback medido;
+- [ ] experimento de conselho de modelos sem dependência prematura.
+
+## era 3 - orbe-memory
 
 status: componentes provisórios existem; era ainda não iniciada formalmente.
 
 - CRUD, contexto textual, auto-memory e políticas atuais são pontes;
 - provider multi-tenant `orbe-memory`, busca semântica e governança completa ficam para esta era.
 
-## era 4 — conhecimento
+## era 4 - conhecimento
 
 status: trabalho antecipado congelado.
 
-os PRs #18, #19 e #21 anteciparam persistência, seleção e rastreabilidade de conhecimento. não avançar agora em citações visuais, cartões de fontes, embeddings ou polimento fino até a primeira vitória real do router.
+Os PRs #18, #19 e #21 anteciparam persistência, seleção e rastreabilidade de conhecimento. Não avançar em citações visuais, cartões de fontes, embeddings ou polimento fino antes dos próximos marcos medidos do router.
 
 ## eras futuras
 
