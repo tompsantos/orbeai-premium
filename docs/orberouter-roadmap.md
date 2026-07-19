@@ -19,15 +19,15 @@ Uma fase não termina apenas porque existe código. Quando aplicável, deve have
 ## marco atual
 
 - data de referência: 2026-07-19;
-- commit oficial de referência: `e48b1d0e15cde9f539a6ab34ad1addd2ba728928`;
+- commit oficial de referência: `dd06189d505ac81a496d1a5c4cd18707a182900c`;
 - kernel atual: `orbe-router-v1`;
 - aplicação ativa: `ai.orbeone.com.br`;
 - providers reais validados: OpenAI, Gemini e NVIDIA NIM;
 - cadastro público: fechado no código e validado na CI; publicação no ambiente rastreada separadamente;
 - fase 2: concluída no escopo de desenvolvimento do GitHub;
 - fase 3: concluída com CI verde e merge do PR #26;
-- fase 4: em andamento com perfis versionados e telemetria real atrás de feature flag;
-- próxima fatia técnica: perfil seguro no Laboratório, governança individual de modelos e fechamento do contrato de capacidades.
+- fase 4: em andamento com perfis versionados, telemetria real e interface segura atrás de feature flag;
+- próxima fatia técnica: governança persistente por workspace e fechamento do contrato de capacidades.
 
 ## fase 0. fundação arquitetural
 
@@ -190,8 +190,11 @@ status: em andamento.
 
 - [x] expor endpoint interno seguro de perfis atrás de feature flag;
 - [x] anexar telemetria segura ao endpoint de perfis;
-- [ ] mostrar perfil seguro no Laboratório;
+- [x] mostrar perfil seguro no Laboratório em rota interna própria;
+- [x] permitir janelas de 7, 30 e 90 dias na interface;
+- [x] diferenciar recurso desativado, modo mock e erro real;
 - [ ] permitir ativar ou desativar modelo por workspace;
+- [ ] remover ou substituir controles locais provisórios da tela antiga;
 - [x] não expor segredo, hint de chave, ciphertext, erro bruto ou payload bruto;
 - [x] excluir placeholders sem adapter do catálogo operacional.
 
@@ -390,4 +393,5 @@ Adicionar novas decisões nesta tabela e criar ADR quando exigido.
 | 2026-07-19 | semântica nova começa em shadow mode | aceito | ADR 0003 |
 | 2026-07-19 | fase 2 de desenvolvimento encerrada no GitHub; rollout da center e ACL permanecem operacionais | aceito | `docs/phase-2-security-closure.md` |
 | 2026-07-19 | perfis de modelos começam como catálogo versionado, sem participar do scoring | fundido | PR #28 |
-| 2026-07-19 | confiabilidade e latência usam tentativas persistidas; tokens e custo usam model runs | em implementação | `docs/model-profiles.md` |
+| 2026-07-19 | confiabilidade e latência usam tentativas persistidas; tokens e custo usam model runs | fundido | PR #29 |
+| 2026-07-19 | interface de perfis permanece somente leitura até existir enforcement por workspace | em implementação | `docs/model-profiles.md` |

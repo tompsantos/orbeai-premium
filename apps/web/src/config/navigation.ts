@@ -2,6 +2,7 @@ import {
   BookOpen,
   Brain,
   Building2,
+  Cpu,
   FlaskConical,
   FolderKanban,
   Gauge,
@@ -42,6 +43,7 @@ export const MAIN_NAV: NavigationItem[] = [
 
 export const LAB_NAV: NavigationItem[] = [
   { id: "laboratory", label: "Laboratório", to: "/app/models", icon: FlaskConical },
+  { id: "model-profiles", label: "Perfis de modelos", to: "/app/model-profiles", icon: Cpu },
 ];
 
 export const ADMIN_NAV: NavigationItem[] = [
