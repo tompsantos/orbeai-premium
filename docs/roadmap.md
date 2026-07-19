@@ -48,7 +48,9 @@ objetivo: tornar o orbeRouter o córtex executivo da orbeAI. ele decide a estrat
 - [x] registrar tentativas, retry e fallback;
 - [x] validar credenciais reais pela interface sem expor segredo;
 - [x] validar OpenAI, Gemini e NVIDIA NIM;
-- [ ] adicionar perfis operacionais versionados por modelo;
+- [x] adicionar perfis operacionais versionados por modelo;
+- [x] persistir tentativas e telemetria real por provider e modelo;
+- [x] aplicar disponibilidade operacional por workspace antes da provider chain;
 - [ ] adicionar health probes e circuit breaker orientados por métricas reais.
 
 ### bloco 2c - primeira fatia vertical real
@@ -85,8 +87,10 @@ critério da primeira vitória: cumprido no ambiente integrado. falta consolidar
 
 ### bloco 2f - perfis, dataset e baseline
 
-- [ ] criar perfis operacionais de modelos;
-- [ ] coletar telemetria real de latência, sucesso, timeout, tokens e custo;
+- [x] criar perfis operacionais de modelos;
+- [x] coletar telemetria real de latência, sucesso, timeout, tokens e custo;
+- [x] expor telemetria e controles seguros no Laboratório;
+- [ ] validar contexto e política de dados por modelo;
 - [ ] criar dataset versionado de decisões;
 - [ ] criar replay offline;
 - [ ] medir baseline do router v1.
