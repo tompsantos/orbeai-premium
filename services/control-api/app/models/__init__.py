@@ -19,6 +19,7 @@ from app.models.core import (
     WorkspaceSettings,
 )
 from app.models.knowledge import KnowledgeMaterial, ResearchReport
+from app.models.router import ProviderAttemptRecord
 
 __all__ = [
     "Artifact",
@@ -34,6 +35,7 @@ __all__ = [
     "ModelProvider",
     "ModelRun",
     "Project",
+    "ProviderAttemptRecord",
     "ResearchReport",
     "User",
     "Workspace",
