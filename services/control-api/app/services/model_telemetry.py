@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import timedelta
 from os import getenv
-from typing import Iterable
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
