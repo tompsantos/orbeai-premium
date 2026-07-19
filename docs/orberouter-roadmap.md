@@ -4,7 +4,7 @@
 
 Este é o quadro oficial da construção do orbeRouter. Atualizar no mesmo PR que concluir ou replanejar uma etapa.
 
-Legenda: `[x]` comprovado, `[ ]` pendente. Código, CI e ambiente devem ser separados quando o rollout for adiado.
+Legenda: `[x]` comprovado, `[ ]` pendente. Código, CI e ambiente devem ser tratados separadamente quando o rollout for adiado.
 
 ## marco atual
 
@@ -12,9 +12,9 @@ Legenda: `[x]` comprovado, `[ ]` pendente. Código, CI e ambiente devem ser sepa
 - kernel: `orbe-router-v1`;
 - fase 2: desenvolvimento concluído, rollout da center pendente;
 - fase 3: concluída;
-- fase 4: concluída no PR #33 com perfis, telemetria, governança, correlação e retenção;
-- fase 5: em andamento com dataset sintético, replay e baseline v1;
-- próxima fatia: casos reais sanitizados e ampliação das fronteiras direto versus cognition.
+- fase 4: concluída no PR #33;
+- fase 5: em andamento com baseline funcional, quarentena de casos reais e baseline de fronteiras;
+- próximo marco: promover casos reais revisados e definir o critério quantitativo de saída da fase 5.
 
 ## fase 0. fundação arquitetural
 
@@ -32,8 +32,6 @@ status: concluída.
 
 status: concluída.
 
-### kernel e execução
-
 - [x] `RouterRequest`, `SemanticClassification`, `RouterDecision` e `ExecutionPlan`;
 - [x] reason codes e capability registry;
 - [x] decisão separada da execução;
@@ -42,15 +40,11 @@ status: concluída.
 - [x] timeout, retry, fallback e tentativas;
 - [x] chat vivo com decisão persistida e SSE `router.decision`;
 - [x] execução direta ou cognition;
-- [x] memória e conhecimento autorizados.
-
-### credenciais reais
-
+- [x] memória e conhecimento autorizados;
 - [x] cofre criptografado por workspace;
-- [x] interface para salvar e testar;
-- [x] OpenAI, Gemini e NVIDIA validadas;
+- [x] OpenAI, Gemini e NVIDIA validadas pela interface;
 - [x] resposta real no chat;
-- [ ] evidência sanitizada com ids de decisão, mensagem e model run.
+- [ ] consolidar evidência sanitizada do ambiente com ids de decisão, mensagem e model run.
 
 ## fase 2. fechamento operacional e segurança
 
@@ -78,45 +72,31 @@ status: concluída.
 
 status: concluída.
 
-### contrato e metadados
+### perfis e governança
 
 - [x] `model-profile-v1`;
 - [x] provider e modelo separados;
-- [x] capacidades obrigatórias e opcionais;
-- [x] formatos, streaming e ferramentas;
-- [x] ciclo de vida e disponibilidade no workspace;
-- [x] contexto validado por id exato quando há fonte oficial;
-- [x] política de dados validada por id exato quando há fonte oficial;
+- [x] capacidades, formatos, streaming e ferramentas;
+- [x] ciclo de vida e disponibilidade por workspace;
+- [x] contexto e política de dados por id exato quando há fonte oficial;
 - [x] ausência de evidência preservada como `not_validated`;
-- [x] fontes e data de validação registradas;
-- [x] qualidade mantida sem nota até benchmark próprio.
-
-### governança operacional
-
+- [x] qualidade sem nota até benchmark próprio;
 - [x] `workspace-model-controls-v1`;
-- [x] controle persistente por provider e modelo exato;
-- [x] metadata reservada;
-- [x] owner/admin e modo somente leitura;
-- [x] audit log `model.control.update`;
-- [x] referência stale rejeitada;
-- [x] modelo desativado removido antes da provider chain;
-- [x] proteção do último executor.
+- [x] owner/admin, auditoria, referência stale e proteção do último executor.
 
 ### tentativas e telemetria
 
 - [x] `provider_attempt_records` por workspace;
-- [x] correlation id por gateway;
+- [x] correlation id por execução;
 - [x] sucesso, falha, skip e falha terminal persistidos;
 - [x] erro sanitizado e categorizado;
 - [x] `model-telemetry-v1`;
 - [x] p50, p95, sucesso, timeout, tokens e custo comprovável;
-- [x] janela de 1 a 90 dias;
-- [x] skips fora do denominador;
-- [x] tentativas de chat ligadas a chat, mensagem e model run;
-- [x] falha terminal e stop antes do primeiro delta recebem model run;
-- [x] retenção física segue `data_retention_days` do workspace;
-- [x] purge isolado e auditado por workspace;
-- [x] agregação mantida sob demanda até 90 dias;
+- [x] tentativas ligadas a chat, mensagem e model run;
+- [x] model run para falha terminal e stop antes do primeiro delta;
+- [x] retenção física pelo workspace;
+- [x] purge isolado e auditado;
+- [x] agregação sob demanda até 90 dias;
 - [x] rollups e circuit breaker encaminhados para a fase 10.
 
 ### interface
@@ -126,10 +106,9 @@ status: concluída.
 - [x] controles efetivos por workspace;
 - [x] estados disabled, mock e erro explícitos;
 - [x] controles locais e decisão simulada removidos;
-- [x] placeholders sem adapter fora do catálogo;
 - [x] nenhum segredo ou payload bruto exposto.
 
-critério de saída: cumprido. catálogo operacional real, observabilidade correlacionada e retenção definida, sem números cenográficos.
+critério de saída: cumprido.
 
 fechamento: `docs/phase-4-closure.md`.
 
@@ -137,41 +116,61 @@ fechamento: `docs/phase-4-closure.md`.
 
 status: em andamento.
 
-### contrato e replay sintético
+### 5a. contrato e baseline funcional
 
 - [x] schema `router-case-v1`;
 - [x] dataset JSONL versionado;
 - [x] ids únicos e campos extras rejeitados;
 - [x] rotas aceitáveis e proibidas;
 - [x] providers, reason codes, capabilities, fallback e classificação;
-- [x] ambiente sintético de disponibilidade sem credencial ou chamada;
+- [x] ambiente sintético sem credencial ou chamada externa;
 - [x] replay `router-replay-v1` usando o kernel real;
-- [x] comando reproduzível e código de saída para CI.
-
-### cobertura inicial
-
-- [x] conversa, escrita, código, documento, pesquisa e estratégia;
-- [x] governo, risco e sensibilidade;
-- [x] memória, conhecimento e contexto combinado;
-- [x] seleção manual e modelo não suportado;
-- [x] custo, rapidez, cognition ativo e desativado;
-- [x] indisponibilidade, fallback e mock;
-- [x] 28 casos em 17 categorias.
-
-### baseline
-
+- [x] comando reproduzível e código de saída para CI;
+- [x] 28 casos em 17 categorias;
 - [x] `router-baseline-v1`;
-- [x] hash SHA-256 do dataset;
-- [x] placar por categoria e distribuição;
-- [x] retrato por caso protegido pela suíte;
-- [x] 28 de 28 casos aprovados na CI;
-- [x] baseline sintético reproduzível do router v1;
-- [ ] adicionar casos reais sanitizados;
-- [ ] cobrir entradas longas e fronteiras ambíguas;
-- [ ] ampliar direto versus cognition;
-- [ ] definir critério quantitativo de saída da fase 5.
+- [x] 28 de 28 casos aprovados na CI.
 
-Documentação: `docs/router-evaluation.md`.
+### 5b. casos reais sanitizados
+
+- [x] contrato `router-real-case-candidate-v1`;
+- [x] isolamento por workspace;
+- [x] ids substituídos por HMAC;
+- [x] nenhum conteúdo bruto no candidato;
+- [x] template de revisão nasce rejeitado;
+- [x] scanner de PII, infraestrutura e segredo;
+- [x] promoção gera somente `router-case-v1` revisado;
+- [x] candidatos e revisões fora do repositório por padrão;
+- [x] pipeline e quarentena validados no PR #35;
+- [ ] executar exportação em ambiente autorizado;
+- [ ] revisar paráfrases sanitizadas;
+- [ ] promover os primeiros casos reais para o dataset versionado.
+
+### 5c. fronteiras e ambiguidades
+
+- [x] contrato `router-boundary-case-v1`;
+- [x] conteúdo materializado por comprimento exato;
+- [x] limites 900/901 e 2.500/2.501;
+- [x] dois versus três sinais semânticos;
+- [x] precedência de escolha manual, modo e intenção;
+- [x] pesquisa combinada com documento, código e risco;
+- [x] memória, conhecimento e contexto combinado;
+- [x] cognition ativo, desativado e com provider indisponível;
+- [x] ambiguidades explícitas, negadas e explicativas de ferramenta;
+- [x] 20 casos em 8 categorias;
+- [x] `router-boundary-baseline-v1`;
+- [x] 20 de 20 casos aprovados na CI;
+- [x] cli `python scripts/router_replay.py --kind boundaries`;
+- [x] comportamento ambíguo documentado sem ser declarado correto.
+
+### saída da fase 5
+
+- [ ] ampliar casos direto versus cognition;
+- [ ] incluir casos reais revisados suficientes para as classes críticas;
+- [ ] definir limiar mínimo por categoria e regressões proibidas;
+- [ ] definir como candidatos futuros serão comparados offline;
+- [ ] aprovar critério quantitativo de saída antes da fase 6.
+
+Documentação: `docs/router-evaluation.md` e `docs/router-real-case-quarantine.md`.
 
 ## fase 6. políticas e hard gates
 
@@ -277,4 +276,6 @@ status: não iniciada.
 - PR #31: governança operacional por workspace;
 - PR #32: metadados oficiais por id exato;
 - PR #33: correlação obrigatória, falhas terminais e retenção auditada;
-- PR #34: dataset sintético, replay offline e baseline v1.
+- PR #34: dataset sintético, replay offline e baseline funcional v1;
+- PR #35: quarentena segura para casos reais;
+- PR #36: dataset e baseline de fronteiras e ambiguidades.
