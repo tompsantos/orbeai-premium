@@ -14,17 +14,19 @@ Legenda:
 - `ambiente:` estado na center;
 - `evidência:` PR, relatório ou ids sanitizados.
 
-Uma fase não termina apenas porque existe código. Quando aplicável, deve haver CI, publicação e validação real.
+Uma fase não termina apenas porque existe código. Quando aplicável, deve haver CI, publicação e validação real. Quando uma publicação for deliberadamente adiada, o roadmap deve separar o fechamento de desenvolvimento do rollout operacional sem apresentar o ambiente como atualizado.
 
 ## marco atual
 
 - data de referência: 2026-07-19;
-- branch documental: `docs/orberouter-master-plan`;
+- commit oficial de referência: `7917adca0a6ecc2b5e1c2e1dd383dad4907c8bf8`;
 - kernel atual: `orbe-router-v1`;
 - aplicação ativa: `ai.orbeone.com.br`;
 - providers reais validados: OpenAI, Gemini e NVIDIA NIM;
-- cadastro público: fechado no `main`, publicação no ambiente ainda pendente;
-- próxima fase técnica: perfis operacionais, telemetria e dataset antes de scoring inteligente.
+- cadastro público: fechado no código e validado na CI; publicação no ambiente rastreada separadamente;
+- fase 2: concluída no escopo de desenvolvimento do GitHub;
+- fase 3: concluída com CI verde e merge do PR #26;
+- próxima fase técnica: fase 4, perfis operacionais e telemetria antes de dataset e scoring inteligente.
 
 ## fase 0. fundação arquitetural
 
@@ -95,9 +97,9 @@ critério de saída: provider real executado pela interface com rastreabilidade 
 
 ## fase 2. fechamento operacional e segurança
 
-status: em andamento.
+status: concluída no escopo de desenvolvimento do GitHub; rollout operacional pendente.
 
-### acesso
+### acesso no código e CI
 
 - [x] criar configuração `PUBLIC_REGISTRATION_ENABLED` com padrão `false`;
 - [x] bloquear endpoint de registro quando fechado;
@@ -106,12 +108,16 @@ status: em andamento.
 - [x] adicionar teste de bloqueio;
 - [x] CI verde no PR #25;
 - [x] merge do PR #25 no `main`;
+- [x] registrar fechamento, evidências e rollback em `docs/phase-2-security-closure.md`.
+
+### rollout operacional pendente
+
 - [ ] publicar release contendo o PR #25;
 - [ ] validar que a tela mostra somente login;
 - [ ] validar que `POST /v1/auth/register` retorna 403;
 - [ ] registrar relatório de implantação e rollback.
 
-### infraestrutura
+### infraestrutura pendente
 
 - [ ] restaurar ACL restritiva da VPC;
 - [ ] validar 22, 80 e 443;
@@ -120,11 +126,15 @@ status: em andamento.
 
 responsável pela ACL: operação manual do proprietário.
 
-critério de saída: acesso público fechado e rede novamente em política restritiva.
+critério de saída do desenvolvimento: implementação, testes, CI, merge e documentação concluídos.
+
+critério de saída do ambiente: acesso público fechado na release ativa e rede novamente em política restritiva.
+
+O rollout operacional está explicitamente diferido e não bloqueia o início da fase 4. O ambiente não deve ser apresentado como atualizado antes das validações acima.
 
 ## fase 3. documentação mestre e governança
 
-status: aguardando CI e merge.
+status: concluída.
 
 - [x] criar `docs/orberouter-manual.md`;
 - [x] criar `docs/orberouter-roadmap.md`;
@@ -132,8 +142,8 @@ status: aguardando CI e merge.
 - [x] adicionar links no README;
 - [x] registrar ADR sobre evolução por evidência e shadow mode;
 - [x] validar coerência entre manual, roadmap, ADR e código;
-- [ ] CI verde;
-- [ ] merge no `main`.
+- [x] CI verde;
+- [x] merge no `main` pelo PR #26.
 
 critério de saída: qualquer novo chat consegue retomar o projeto sem reconstruir contexto histórico.
 
@@ -359,3 +369,4 @@ Adicionar novas decisões nesta tabela e criar ADR quando exigido.
 | 2026-07-19 | cadastro público fechado por padrão | fundido, ambiente pendente | PR #25 |
 | 2026-07-19 | router será evoluído no github, validado na CI e só depois publicado | aceito | ADR 0003 |
 | 2026-07-19 | semântica nova começa em shadow mode | aceito | ADR 0003 |
+| 2026-07-19 | fase 2 de desenvolvimento encerrada no GitHub; rollout da center e ACL permanecem operacionais | aceito | `docs/phase-2-security-closure.md` |
