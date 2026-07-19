@@ -4,6 +4,7 @@ from collections.abc import Iterable, Mapping
 
 from sqlalchemy.orm import Session
 
+from app.db.session import SessionLocal
 from app.models import ProviderAttemptRecord
 
 
@@ -51,3 +52,23 @@ def persist_provider_attempt_records(
         records.append(record)
 
     return records
+
+
+def persist_gateway_attempt_records(
+    *,
+    workspace_id: str,
+    correlation_id: str,
+    attempts: Iterable[Mapping[str, object]],
+) -> list[ProviderAttemptRecord]:
+    with SessionLocal() as db:
+        records = persist_provider_attempt_records(
+            db,
+            workspace_id=workspace_id,
+            chat_id=None,
+            request_id=correlation_id,
+            attempts=attempts,
+        )
+        db.commit()
+        for record in records:
+            db.refresh(record)
+        return records
