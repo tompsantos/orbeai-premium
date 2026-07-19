@@ -11,6 +11,7 @@ from app.models import ModelRun
 from app.schemas.model_providers import (
     ModelProfileRead,
     ModelProviderRead,
+    ProviderAttemptRetentionRead,
     WorkspaceModelControlRead,
     WorkspaceModelControlUpdate,
 )
@@ -26,7 +27,9 @@ from app.services.model_controls import (
 )
 from app.services.model_profiles import build_model_profiles
 from app.services.model_telemetry import build_model_telemetry_map
+from app.services.provider_attempt_records import purge_expired_provider_attempt_records
 from app.services.provider_registry import ProviderModel, ProviderState, build_provider_registry
+from app.services.workspace_settings import get_or_create_workspace_settings
 
 router = APIRouter(prefix="/model-providers", tags=["model-providers"])
 
@@ -273,6 +276,43 @@ def update_model_control(
         commit=True,
     )
     return _control_read(effective, stored=control)
+
+
+@router.post("/attempts/retention/run", response_model=ProviderAttemptRetentionRead)
+def run_provider_attempt_retention(
+    db: Session = Depends(get_db),
+    context: CurrentWorkspaceContext = Depends(get_current_workspace_context),
+) -> ProviderAttemptRetentionRead:
+    _require_admin(context)
+    _require_profiles_enabled(db, context)
+    workspace_settings = get_or_create_workspace_settings(db, context.workspace)
+    retention_days = max(1, int(workspace_settings.data_retention_days))
+    deleted_records = purge_expired_provider_attempt_records(
+        db,
+        workspace_id=context.workspace_id,
+        retention_days=retention_days,
+    )
+    write_audit_log(
+        db=db,
+        workspace_id=context.workspace_id,
+        action="provider.attempt.retention",
+        resource_type="provider_attempt_record",
+        resource_id=context.workspace_id,
+        meta={
+            "retention_days": retention_days,
+            "deleted_records": deleted_records,
+            "aggregation_mode": "on_demand_window",
+            "max_query_window_days": 90,
+            "actor_user_id": context.user_id,
+        },
+        commit=True,
+    )
+    return ProviderAttemptRetentionRead(
+        retention_days=retention_days,
+        deleted_records=deleted_records,
+        aggregation_mode="on_demand_window",
+        max_query_window_days=90,
+    )
 
 
 @router.get("", response_model=list[ModelProviderRead])
