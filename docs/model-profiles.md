@@ -2,11 +2,11 @@
 
 ## finalidade
 
-Esta documentação registra a primeira fatia da fase 4 do orbeRouter. O objetivo é separar o conceito de provider do conceito de modelo e criar um catálogo versionado sem inventar qualidade, contexto, custo, política de dados ou saúde.
+Esta documentação registra a fase 4 do orbeRouter. O objetivo é separar o conceito de provider do conceito de modelo e criar um catálogo versionado com telemetria real, sem inventar qualidade, contexto, custo, política de dados ou saúde.
 
 O contrato não altera o roteamento ativo e não participa do score. A exposição pela API é protegida pela feature flag `router_model_profiles`, desabilitada por padrão.
 
-## contrato inicial
+## contrato de perfil
 
 Cada `ModelProfile` registra:
 
@@ -44,11 +44,11 @@ O perfil diferencia as fontes:
 - `code_registry`: declaração comprovada pelo código atual;
 - `runtime_configuration`: modelo resolvido por configuração de ambiente ou cofre do workspace;
 - `provider_default`: modelo padrão do adapter sem credencial resolvida;
-- `runtime_telemetry`: dado que deverá ser calculado a partir de execuções persistidas;
+- `runtime_telemetry`: dado calculado a partir de execuções persistidas;
 - `official_documentation`: dado futuro validado por documentação oficial;
 - `not_validated`: informação ainda não comprovada.
 
-Na primeira fatia:
+Nesta fase:
 
 - `context_window_tokens` permanece `null`;
 - `data_policy` permanece `not_validated`;
@@ -58,14 +58,78 @@ Na primeira fatia:
 - streaming é marcado como `emulated` somente quando o adapter atual declara essa capacidade;
 - ferramentas permanecem `not_implemented`.
 
+## persistência de tentativas
+
+Cada chamada ao provider gateway recebe um `correlation_id`. Antes de retornar sucesso ou falha terminal, o gateway persiste todas as tentativas em `provider_attempt_records`.
+
+Cada registro contém:
+
+- workspace;
+- correlation id;
+- provider e modelo;
+- número da tentativa;
+- status `success`, `failed` ou `skipped`;
+- latência observada;
+- classificação sanitizada da falha;
+- tipo da exceção;
+- motivo operacional do estado quando a tentativa foi pulada.
+
+A tabela possui campos opcionais para chat, mensagem e model run. A primeira implementação persiste a correlação do gateway; a ligação direta com essas entidades poderá ser aprofundada sem alterar o contrato de telemetria.
+
+Erros brutos de provider não são gravados nesta tabela.
+
+## telemetria
+
+A versão inicial é `model-telemetry-v1`.
+
+A janela é informada pelo endpoint, com mínimo de 1 e máximo de 90 dias. O padrão é 30 dias.
+
+Métricas por provider e modelo:
+
+- quantidade total de tentativas;
+- tentativas realmente executadas;
+- sucessos;
+- falhas;
+- tentativas puladas;
+- timeouts;
+- taxa de sucesso;
+- taxa de timeout;
+- latência p50;
+- latência p95;
+- quantidade de model runs;
+- cobertura de tokens;
+- tokens de entrada e saída;
+- estado da configuração de custo;
+- quantidade de amostras de custo;
+- custo estimado total quando comprovável;
+- data da última tentativa.
+
+Tentativas `skipped` não entram no denominador das taxas de sucesso e timeout. Os percentis usam interpolação linear sobre latências de tentativas `success` e `failed`.
+
+Tokens e custo vêm de `ModelRun`. Latência e confiabilidade vêm de `provider_attempt_records`, porque o tempo total do turno inclui trabalho que não pertence ao provider.
+
+## custo
+
+O sistema não transforma zero em preço conhecido.
+
+Estados possíveis:
+
+- `configured`: tabela configurada e amostras positivas existentes;
+- `configured_no_samples`: tabela configurada, mas ainda sem amostra válida;
+- `not_configured`: tabela de preço não configurada;
+- `not_applicable`: mock declarado.
+
+Quando o custo não é comprovável, `estimated_cost_usd_total` permanece `null`.
+
 ## segurança
 
-O payload público do perfil não inclui:
+O payload público do perfil e da telemetria não inclui:
 
 - chave de API;
 - hint da chave;
 - ciphertext;
 - fonte detalhada da credencial;
+- erro bruto do provider;
 - payload bruto de provider;
 - conteúdo de mensagens;
 - segredo ou configuração privada do workspace.
@@ -73,12 +137,12 @@ O payload público do perfil não inclui:
 ## endpoint
 
 ```text
-GET /v1/model-providers/profiles
+GET /v1/model-providers/profiles?window_days=30
 ```
 
-Com a flag desligada, o endpoint retorna HTTP 404. Com a flag ligada no workspace, retorna somente os perfis gerados a partir do registry real.
+Com a flag desligada, o endpoint retorna HTTP 404. Com a flag ligada no workspace, retorna somente os perfis gerados a partir do registry real e sua telemetria para a janela solicitada.
 
-## limites desta fatia
+## limites atuais
 
 Ainda não foram implementados:
 
@@ -86,16 +150,16 @@ Ainda não foram implementados:
 - data de validação por modelo;
 - contexto validado;
 - política de dados validada;
-- latência p50 e p95;
-- taxa de sucesso e timeout;
-- tokens agregados;
-- custo agregado;
 - qualidade por classe de tarefa;
 - ativação ou desativação individual de modelo;
-- interface nova no Laboratório.
+- interface nova no Laboratório;
+- uso das métricas no roteamento;
+- health score e circuit breaker;
+- retenção física ou agregação histórica além da janela de consulta;
+- associação obrigatória de cada tentativa ao model run e à mensagem.
 
 ## próxima fatia
 
-A próxima etapa deverá calcular telemetria por `provider_name` e `model_name` a partir de `ModelRun`, com janela explícita, amostra, p50, p95, sucesso, timeout, tokens e custo apenas quando a tabela de preço estiver configurada.
+A próxima etapa da fase 4 deverá mostrar o perfil seguro no Laboratório, permitir governança individual por modelo e fechar os campos de capacidade obrigatória e opcional. Depois disso, o projeto avança para o dataset e baseline da fase 5.
 
-Nenhuma dessas métricas deve entrar no scoring antes do dataset e do baseline da fase 5.
+Nenhuma métrica desta fase entra no scoring antes do dataset e do baseline reproduzível.
