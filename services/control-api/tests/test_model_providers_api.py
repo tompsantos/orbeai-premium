@@ -46,16 +46,26 @@ def test_model_profiles_endpoint_exposes_registered_models_and_telemetry(monkeyp
 
     assert response.status_code == 200
     profiles = response.json()
-    slugs = [profile["provider_slug"] for profile in profiles]
+    profiles_by_slug = {profile["provider_slug"]: profile for profile in profiles}
 
-    assert slugs == ["openai", "gemini", "nvidia", "mock"]
-    assert "anthropic" not in slugs
-    assert "qwen" not in slugs
+    assert list(profiles_by_slug) == ["openai", "gemini", "nvidia", "mock"]
+    assert "anthropic" not in profiles_by_slug
+    assert "qwen" not in profiles_by_slug
     assert all(profile["profile_version"] == "model-profile-v1" for profile in profiles)
-    assert all(profile["context_window_tokens"] is None for profile in profiles)
-    assert all(profile["data_policy"] == "not_validated" for profile in profiles)
+
+    assert profiles_by_slug["openai"]["context_window_tokens"] == 1_000_000
+    assert profiles_by_slug["gemini"]["context_window_tokens"] == 1_048_576
+    assert profiles_by_slug["nvidia"]["context_window_tokens"] == 1_000_000
+    assert profiles_by_slug["mock"]["context_window_tokens"] is None
+
+    assert profiles_by_slug["openai"]["data_policy"] != "not_validated"
+    assert profiles_by_slug["gemini"]["data_policy"] != "not_validated"
+    assert profiles_by_slug["nvidia"]["data_policy"] == "not_validated"
+    assert profiles_by_slug["mock"]["data_policy"] == "not_validated"
+
     assert all("key_hint" not in profile for profile in profiles)
     assert all("credential_source" not in profile for profile in profiles)
+    assert all("reference_url" not in profile for profile in profiles)
     assert all(profile["telemetry"]["telemetry_version"] == "model-telemetry-v1" for profile in profiles)
     assert all(profile["telemetry"]["window_days"] == 7 for profile in profiles)
     assert all(profile["telemetry"]["attempt_sample_count"] >= 0 for profile in profiles)

@@ -2,182 +2,104 @@
 
 ## finalidade
 
-Esta documentação registra a fase 4 do orbeRouter. O objetivo é separar provider de modelo e manter um catálogo versionado com telemetria e governança reais, sem inventar qualidade, contexto, custo, política de dados ou saúde.
+A fase 4 separa provider de modelo e mantém um catálogo versionado com telemetria, governança e evidência real. O contrato não participa do scoring e permanece protegido pela flag `router_model_profiles`, desligada por padrão.
 
-O contrato não participa do scoring. A exposição e os controles são protegidos pela feature flag `router_model_profiles`, desabilitada por padrão.
+## contrato
 
-## contrato de perfil
+A versão atual é `model-profile-v1`. Cada perfil registra:
 
-A versão inicial é `model-profile-v1`.
-
-Cada `ModelProfile` registra:
-
-- provider e modelo em campos separados;
-- identificador e versão estáveis;
-- ciclo de vida;
-- estado, executabilidade e disponibilidade no workspace;
+- provider e modelo separados;
+- ciclo de vida e executabilidade;
+- disponibilidade efetiva no workspace;
 - capacidades obrigatórias e opcionais;
-- formatos de entrada e saída;
-- streaming e ferramentas;
-- contexto validado;
-- política de dados;
-- estado e data de validação;
-- fonte de evidência por grupo de campos;
+- formatos, streaming e ferramentas;
+- contexto e política de dados quando validados;
+- data e fonte de evidência;
 - telemetria da janela consultada.
 
-`stream_emulation` é capacidade opcional. As demais capacidades declaradas pelo registry são obrigatórias para o perfil atual.
+`stream_emulation` é opcional. As demais capacidades declaradas pelo registry são obrigatórias no perfil atual.
 
-## modelos incluídos
+## catálogo operacional
 
-O catálogo nasce somente do `ProviderRegistry` da orbeAI:
-
-- OpenAI;
-- Google Gemini;
-- NVIDIA NIM;
-- mock declarado.
-
-Anthropic, Qwen, Groq e modelos locais permanecem placeholders enquanto não houver adapter e execução real. Placeholder não recebe perfil operacional e não pode ser habilitado por controle de workspace.
-
-## evidência e campos desconhecidos
+O catálogo nasce somente do `ProviderRegistry`: OpenAI, Gemini, NVIDIA NIM e mock declarado. Anthropic, Qwen, Groq e modelos locais permanecem placeholders até existir adapter executável.
 
 Fontes reconhecidas:
 
-- `code_registry`: declaração comprovada pelo código;
-- `runtime_configuration`: modelo resolvido pelo ambiente ou cofre;
-- `workspace_configuration`: disponibilidade definida pelo workspace;
-- `provider_default`: padrão do adapter sem credencial resolvida;
-- `runtime_telemetry`: dado calculado a partir de execuções persistidas;
-- `official_documentation`: documentação oficial validada;
-- `not_validated`: informação ainda não comprovada.
+- `code_registry`;
+- `runtime_configuration`;
+- `workspace_configuration`;
+- `provider_default`;
+- `runtime_telemetry`;
+- `official_documentation`;
+- `not_validated`.
 
-Enquanto não houver evidência:
+Sem evidência, contexto permanece `null`, política permanece `not_validated` e qualidade não recebe nota.
 
-- `context_window_tokens` permanece `null`;
-- `data_policy` permanece `not_validated`;
-- qualidade não recebe nota operacional;
-- providers reais permanecem `experimental`;
-- ferramentas permanecem `not_implemented`;
-- mock permanece identificado como mock.
+## metadados oficiais
+
+O registry curado usa correspondência exata de `provider_slug` e `model_name`. Nomes parecidos, aliases presumidos e modelos customizados não herdam dados.
+
+Metadados validados em `2026-07-19`:
+
+- `openai:gpt-5.5`: contexto de 1.000.000 tokens e política da API documentada;
+- `gemini:gemini-3.5-flash`: contexto de 1.048.576 tokens e política dependente do tipo de cobrança documentada;
+- `nvidia:nvidia/nemotron-3-super-120b-a12b`: contexto de 1.000.000 tokens; política do endpoint hospedado permanece `not_validated`.
+
+As fontes, URLs e limites estão em `docs/model-profile-official-metadata.md`. URLs de evidência não entram no payload público.
+
+Estados de validação:
+
+- `metadata_validated_profile_not_benchmarked`;
+- `context_validated_policy_not_validated`;
+- `profile_not_benchmarked`;
+- `deterministic_mock`.
+
+Metadado validado não aprova o modelo e não mede qualidade.
 
 ## governança por workspace
 
-A versão inicial do controle é `workspace-model-controls-v1`.
-
-Os controles ficam em metadata reservada de `WorkspaceSettings`, sob a chave `model_controls`. Essa chave:
-
-- não é retornada pelo endpoint genérico de configurações;
-- não pode ser alterada pelo patch genérico do workspace;
-- só é manipulada pelo serviço dedicado;
-- registra provider, modelo, estado, data e usuário responsável.
-
-A chave lógica do controle é:
+A versão do controle é `workspace-model-controls-v1`. Os controles ficam em metadata reservada de `WorkspaceSettings`, sob `model_controls`, e usam a chave lógica:
 
 ```text
 provider_slug:model_name
 ```
 
-O nome exato do modelo faz parte da chave. Quando uma credencial troca o modelo configurado, controles antigos não são aplicados ao novo modelo por acidente.
+Somente owner e admin alteram controles. Demais membros consultam perfis em modo somente leitura.
 
-### autorização
-
-Somente membros com função `owner` ou `admin` podem consultar e alterar controles. Outros membros continuam podendo consultar perfis quando a feature flag estiver ligada, mas recebem a tela em modo somente leitura.
-
-### enforcement
-
-Um modelo desativado pelo workspace:
+Um modelo desativado:
 
 - recebe `workspace_enabled=false`;
 - entra no estado `disabled`;
-- recebe o reason code operacional `workspace_model_disabled`;
-- deixa de ser executável;
-- é removido da `provider_chain` antes da decisão;
-- não vira tentativa nem pode reaparecer no gateway.
+- recebe `workspace_model_disabled`;
+- sai da `provider_chain` antes da decisão;
+- não vira tentativa no gateway.
 
-A API simula o registry antes de persistir uma alteração. Ela retorna HTTP 409 quando a mudança deixaria o workspace sem nenhum modelo executável.
-
-Essa governança representa disponibilidade operacional. Orçamento, classes de dados, permissões e políticas completas continuam reservados para a fase 6.
+A API rejeita referência stale e impede que uma alteração deixe o workspace sem executor.
 
 ## endpoints
 
-### perfis e telemetria
-
 ```text
 GET /v1/model-providers/profiles?window_days=30
-```
-
-A janela aceita de 1 a 90 dias. Com a flag desligada, o endpoint retorna HTTP 404.
-
-### controles efetivos
-
-```text
 GET /v1/model-providers/controls
-```
-
-Retorna o controle e o estado efetivo dos modelos registrados para owner e admin.
-
-### atualizar controle
-
-```text
 PUT /v1/model-providers/controls
 ```
 
-Payload:
+A janela de telemetria aceita de 1 a 90 dias. A atualização de controle valida provider, modelo exato, autorização e cadeia resultante, persiste o estado e registra `model.control.update`.
 
-```json
-{
-  "provider_slug": "openai",
-  "model_name": "modelo-exato-do-registry",
-  "enabled": false
-}
-```
+## tentativas e telemetria
 
-A operação:
+Cada execução recebe `correlation_id`. Sucessos, falhas e skips são persistidos em `provider_attempt_records` antes do retorno ou da falha terminal.
 
-- valida provider e nome atual do modelo;
-- rejeita referência stale;
-- protege o último executor;
-- persiste o controle;
-- reconstrói o registry;
-- registra audit log `model.control.update`;
-- devolve o estado efetivo.
+A telemetria `model-telemetry-v1` registra:
 
-## persistência de tentativas
-
-Cada execução do gateway recebe um `correlation_id`. Sucessos, falhas e skips são persistidos em `provider_attempt_records` antes do retorno ou da falha terminal.
-
-O registro contém workspace, provider, modelo, tentativa, status, latência e classificação sanitizada da falha. Erro bruto, segredo e conteúdo da mensagem não são gravados.
-
-## telemetria
-
-A versão inicial é `model-telemetry-v1`.
-
-Métricas por provider e modelo:
-
-- tentativas totais e executadas;
-- sucessos, falhas e skips;
-- timeouts;
+- tentativas, sucessos, falhas, skips e timeouts;
 - taxa de sucesso e timeout;
 - p50 e p95;
-- model runs e cobertura de tokens;
-- tokens de entrada e saída;
+- model runs e tokens;
 - estado e amostras de custo;
-- custo estimado total quando comprovável;
-- última tentativa observada.
+- última tentativa.
 
-Skips não entram no denominador de confiabilidade. Latência e confiabilidade vêm das tentativas; tokens e custo vêm de `ModelRun`.
-
-## custo
-
-Zero não é tratado como preço conhecido.
-
-Estados:
-
-- `configured`;
-- `configured_no_samples`;
-- `not_configured`;
-- `not_applicable` para mock.
-
-Quando custo não é comprovável, o total permanece `null`.
+Skips não entram no denominador de confiabilidade. Latência e confiabilidade vêm das tentativas; tokens e custo vêm de `ModelRun`. Custo desconhecido permanece `null`.
 
 ## laboratório
 
@@ -188,51 +110,29 @@ Rotas:
 /app/model-profiles
 ```
 
-`/app/models` agora apresenta providers e model runs reais. Foram removidos:
+`/app/models` mostra providers e model runs reais. Provider padrão, fallback local, modo local e decisão simulada foram removidos.
 
-- provider padrão salvo em `localStorage`;
-- fallback local;
-- modo de roteamento local;
-- decisão simulada;
-- latência, custo e qualidade fabricados no frontend.
-
-`/app/model-profiles` apresenta perfis, telemetria, fontes de evidência e controles reais. Owner e admin podem habilitar ou desabilitar modelos; outros membros recebem modo somente leitura.
-
-Estados seguros da tela:
-
-- `ready`;
-- `disabled`;
-- `mock`;
-- `error`.
+`/app/model-profiles` mostra perfis, telemetria, contexto, política, fontes e controles efetivos.
 
 ## segurança
 
-O payload e a interface não incluem:
-
-- chave ou hint de API;
-- ciphertext;
-- fonte detalhada da credencial;
-- erro bruto;
-- payload de provider;
-- conteúdo de mensagens;
-- metadata reservada completa;
-- segredo do workspace.
+O payload e a interface não incluem segredo, hint de chave, ciphertext, URL de evidência, erro bruto, payload de provider, conteúdo de mensagem ou metadata reservada completa.
 
 ## limites atuais
 
-Ainda não foram concluídos:
+Ainda faltam:
 
-- contexto validado por modelo;
-- política de dados validada;
-- data formal de validação;
+- política específica do endpoint NVIDIA hospedado;
+- metadados para modelos customizados e aliases não documentados;
 - qualidade por classe de tarefa;
 - retenção física e agregação histórica;
-- associação obrigatória de tentativa a mensagem e model run;
+- associação obrigatória entre tentativa, mensagem e model run;
+- revalidação transacional ao remover credenciais;
 - health score e circuit breaker;
-- uso de telemetria em scoring.
+- uso da telemetria em scoring.
 
 ## próxima fatia
 
-A próxima fatia da fase 4 deverá validar contexto e política de dados a partir de fontes oficiais para modelos conhecidos, mantendo modelos desconhecidos como `not_validated`. Depois será decidido se retenção e associação obrigatória fecham nesta fase ou migram para a fase de saúde e observabilidade.
+A próxima fatia fecha a observabilidade da fase 4: associação obrigatória entre tentativa, mensagem e model run e decisão explícita sobre retenção/agregação. Itens próprios de saúde serão movidos para a fase 10 sem duplicação.
 
-Nenhuma métrica entra no scoring antes do dataset e do baseline reproduzível da fase 5.
+Nenhuma métrica entra no scoring antes do dataset e do baseline da fase 5.

@@ -5,6 +5,7 @@ from app.services.model_profiles import (
     build_model_profiles,
 )
 from app.services.provider_registry import ProviderModel, ProviderRegistry, ProviderState
+from app.services.validated_model_metadata import resolve_validated_model_metadata
 
 
 def provider_model(
@@ -46,11 +47,61 @@ def test_model_profile_is_versioned_and_does_not_invent_evidence() -> None:
     assert profile.context_window_tokens is None
     assert profile.data_policy == "not_validated"
     assert profile.validation_status == "profile_not_benchmarked"
+    assert profile.validated_at is None
     assert profile.evidence_sources["workspace_control"] == "workspace_configuration"
     assert profile.evidence_sources["context_window"] == "not_validated"
+    assert profile.evidence_sources["data_policy"] == "not_validated"
     assert profile.evidence_sources["quality"] == "not_validated"
     assert "key_hint" not in payload
     assert "credential_source" not in payload
+    assert "reference_url" not in payload
+
+
+def test_gpt_55_uses_exact_official_metadata() -> None:
+    profile = build_model_profile(provider_model("openai", model_name="gpt-5.5"))
+
+    assert profile.context_window_tokens == 1_000_000
+    assert (
+        profile.data_policy
+        == "api_not_used_for_training_by_default_abuse_logs_up_to_30_days"
+    )
+    assert profile.validation_status == "metadata_validated_profile_not_benchmarked"
+    assert profile.validated_at == "2026-07-19"
+    assert profile.evidence_sources["context_window"] == "official_documentation"
+    assert profile.evidence_sources["data_policy"] == "official_documentation"
+    assert profile.evidence_sources["quality"] == "not_validated"
+
+
+def test_gemini_35_flash_records_tier_dependent_data_policy() -> None:
+    profile = build_model_profile(provider_model("gemini", model_name="gemini-3.5-flash"))
+
+    assert profile.context_window_tokens == 1_048_576
+    assert profile.data_policy == (
+        "billing_dependent_paid_not_used_for_improvement_"
+        "unpaid_may_be_used_for_improvement"
+    )
+    assert profile.validation_status == "metadata_validated_profile_not_benchmarked"
+    assert profile.evidence_sources["context_window"] == "official_documentation"
+    assert profile.evidence_sources["data_policy"] == "official_documentation"
+
+
+def test_nemotron_validates_context_without_inventing_data_policy() -> None:
+    profile = build_model_profile(
+        provider_model("nvidia", model_name="nvidia/nemotron-3-super-120b-a12b")
+    )
+
+    assert profile.context_window_tokens == 1_000_000
+    assert profile.data_policy == "not_validated"
+    assert profile.validation_status == "context_validated_policy_not_validated"
+    assert profile.validated_at == "2026-07-19"
+    assert profile.evidence_sources["context_window"] == "official_documentation"
+    assert profile.evidence_sources["data_policy"] == "not_validated"
+
+
+def test_metadata_lookup_does_not_guess_similar_model_names() -> None:
+    assert resolve_validated_model_metadata("openai", "gpt-5.5-custom") is None
+    assert resolve_validated_model_metadata("gemini", "gemini-3.5-flash-latest") is None
+    assert resolve_validated_model_metadata("nvidia", "nemotron-3-super-120b-a12b") is None
 
 
 def test_model_profile_exposes_workspace_disabled_state() -> None:
