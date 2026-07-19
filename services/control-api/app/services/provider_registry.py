@@ -81,8 +81,10 @@ class ProviderRegistry:
 
         chain: list[str] = []
         for provider_slug in ordered:
-            if provider_slug in self.providers and provider_slug not in chain:
-                chain.append(provider_slug)
+            provider = self.providers.get(provider_slug)
+            if provider is None or not provider.executable or provider_slug in chain:
+                continue
+            chain.append(provider_slug)
         return chain
 
     def persisted_payload(self) -> list[dict[str, object]]:
