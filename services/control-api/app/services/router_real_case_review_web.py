@@ -5,13 +5,14 @@ import secrets
 from collections.abc import Callable
 from typing import Any
 
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
+
 from app.services.router_real_case_review import (
     CRITICAL_REAL_CASE_CATEGORIES,
     ReviewUpdate,
     RouterRealCaseReviewSession,
 )
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse
 
 
 def _review_html(token: str) -> str:
