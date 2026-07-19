@@ -13,6 +13,7 @@ def provider_model(
     model_name: str,
     state: ProviderState = ProviderState.CONFIGURED,
     is_real: bool = True,
+    workspace_enabled: bool = True,
 ) -> ProviderModel:
     return ProviderModel(
         provider_slug=slug,
@@ -24,6 +25,7 @@ def provider_model(
         is_real=is_real,
         credential_source="environment" if is_real else None,
         key_hint="••••test" if is_real else None,
+        workspace_enabled=workspace_enabled,
     )
 
 
@@ -36,15 +38,34 @@ def test_model_profile_is_versioned_and_does_not_invent_evidence() -> None:
     assert profile.provider_slug == "openai"
     assert profile.model_name == "gpt-test"
     assert profile.lifecycle is ModelLifecycle.EXPERIMENTAL
+    assert profile.workspace_enabled is True
     assert profile.streaming == "emulated"
     assert profile.tool_support == "not_implemented"
+    assert profile.required_capabilities == ("text_chat", "direct_execution")
+    assert profile.optional_capabilities == ("stream_emulation",)
     assert profile.context_window_tokens is None
     assert profile.data_policy == "not_validated"
     assert profile.validation_status == "profile_not_benchmarked"
+    assert profile.evidence_sources["workspace_control"] == "workspace_configuration"
     assert profile.evidence_sources["context_window"] == "not_validated"
     assert profile.evidence_sources["quality"] == "not_validated"
     assert "key_hint" not in payload
     assert "credential_source" not in payload
+
+
+def test_model_profile_exposes_workspace_disabled_state() -> None:
+    profile = build_model_profile(
+        provider_model(
+            "openai",
+            model_name="gpt-disabled",
+            state=ProviderState.DISABLED,
+            workspace_enabled=False,
+        )
+    )
+
+    assert profile.workspace_enabled is False
+    assert profile.executable is False
+    assert profile.provider_state == "disabled"
 
 
 def test_model_profiles_are_built_only_from_registered_models() -> None:
