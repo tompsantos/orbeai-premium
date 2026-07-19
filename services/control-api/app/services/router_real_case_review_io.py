@@ -8,15 +8,16 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
 from app.models import AuditLog, Chat, Message
 from app.services.router_real_cases import (
     RouterRealCaseCandidate,
     build_real_case_candidate,
     sanitization_violations,
 )
-from pydantic import BaseModel
-from sqlalchemy import select
-from sqlalchemy.orm import Session
 
 _SOURCE_ACTIONS = (
     "router.decision",
