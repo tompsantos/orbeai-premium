@@ -9,12 +9,11 @@ Legenda: `[x]` comprovado, `[ ]` pendente. Código, CI e ambiente devem ser sepa
 ## marco atual
 
 - data: 2026-07-19;
-- commit oficial de referência: `f55488c65eeacddb7b3f1148008336a45fcdae1b`;
 - kernel: `orbe-router-v1`;
 - fase 2: desenvolvimento concluído, rollout da center pendente;
 - fase 3: concluída;
-- fase 4: em andamento com perfis, telemetria, governança e metadados oficiais;
-- próxima fatia: associação obrigatória de tentativas e estratégia de retenção/agregação.
+- fase 4: concluída no PR #33 com perfis, telemetria, governança, correlação e retenção;
+- próxima fase: dataset, replay offline e baseline reproduzível.
 
 ## fase 0. fundação arquitetural
 
@@ -76,7 +75,7 @@ status: concluída.
 
 ## fase 4. perfis operacionais e observabilidade
 
-status: em andamento.
+status: concluída.
 
 ### contrato e metadados
 
@@ -112,8 +111,12 @@ status: em andamento.
 - [x] p50, p95, sucesso, timeout, tokens e custo comprovável;
 - [x] janela de 1 a 90 dias;
 - [x] skips fora do denominador;
-- [ ] associar obrigatoriamente tentativa, chat, mensagem e model run;
-- [ ] definir retenção física e agregação histórica.
+- [x] tentativas de chat ligadas a chat, mensagem e model run;
+- [x] falha terminal e stop antes do primeiro delta recebem model run;
+- [x] retenção física segue `data_retention_days` do workspace;
+- [x] purge isolado e auditado por workspace;
+- [x] agregação mantida sob demanda até 90 dias;
+- [x] rollups e circuit breaker encaminhados para a fase 10.
 
 ### interface
 
@@ -125,11 +128,13 @@ status: em andamento.
 - [x] placeholders sem adapter fora do catálogo;
 - [x] nenhum segredo ou payload bruto exposto.
 
-critério de saída: catálogo operacional real, observabilidade correlacionada e retenção definida, sem números cenográficos.
+critério de saída: cumprido. catálogo operacional real, observabilidade correlacionada e retenção definida, sem números cenográficos.
+
+fechamento: `docs/phase-4-closure.md`.
 
 ## fase 5. dataset e baseline
 
-status: não iniciada.
+status: próxima fase.
 
 - [ ] schema versionado do caso de roteamento;
 - [ ] dataset sintético e casos reais sanitizados;
@@ -192,6 +197,7 @@ status: não iniciada.
 
 status: não iniciada.
 
+- [ ] avaliar necessidade de rollups históricos com volume real;
 - [ ] estados de saúde e janelas;
 - [ ] sucesso, timeout, p95, autenticação e rate limit;
 - [ ] abertura, half-open probe e transições auditadas;
@@ -240,4 +246,5 @@ status: não iniciada.
 - PR #29: tentativas e telemetria reais;
 - PR #30: interface segura de perfis;
 - PR #31: governança operacional por workspace;
-- fase 4e: metadados oficiais por id exato, desconhecidos preservados.
+- PR #32: metadados oficiais por id exato;
+- PR #33: correlação obrigatória, falhas terminais e retenção auditada.

@@ -56,6 +56,7 @@ def test_live_fallback_uses_and_persists_selected_knowledge(monkeypatch) -> None
     material = material_response.json()
 
     captured: dict[str, str | None] = {}
+    correlation_id = "gw_live_knowledge_trace"
 
     def fake_execute_provider_plan(
         _plan: object,
@@ -66,8 +67,14 @@ def test_live_fallback_uses_and_persists_selected_knowledge(monkeypatch) -> None
         memory_context: str | None = None,
         knowledge_context: str | None = None,
         real_providers_enabled: bool = True,
+        workspace_id: str | None = None,
+        chat_id: str | None = None,
+        message_id: str | None = None,
     ) -> GatewayExecution:
         captured["knowledge_context"] = knowledge_context
+        captured["workspace_id"] = workspace_id
+        captured["chat_id"] = chat_id
+        captured["message_id"] = message_id
         result = ProviderExecutionResult(
             content="fallback validado com conhecimento persistido",
             provider_name="orbe-test",
@@ -90,6 +97,7 @@ def test_live_fallback_uses_and_persists_selected_knowledge(monkeypatch) -> None
             ),
             selected_provider_slug="orbe-test",
             used_fallback=False,
+            correlation_id=correlation_id,
         )
 
     monkeypatch.setattr(
@@ -135,6 +143,9 @@ def test_live_fallback_uses_and_persists_selected_knowledge(monkeypatch) -> None
     assert selected_context is not None
     assert report["id"] in selected_context
     assert material["id"] in selected_context
+    assert captured["workspace_id"]
+    assert captured["chat_id"]
+    assert captured["message_id"]
 
     completed = events[-1]["response"]
     assistant_meta = completed["assistant_message"]["meta"]
@@ -142,6 +153,7 @@ def test_live_fallback_uses_and_persists_selected_knowledge(monkeypatch) -> None
     assert {source["source_id"] for source in assistant_meta["knowledge_sources"]} == source_ids
     assert assistant_meta["feature_knowledge_context_enabled"] is True
     assert assistant_meta["router_decision"]["route_kind"] == "knowledge"
+    assert assistant_meta["provider_correlation_id"] == correlation_id
 
     selection_logs = client.get(
         "/v1/audit-logs?action=knowledge.context.select&limit=300"
@@ -156,6 +168,7 @@ def test_live_fallback_uses_and_persists_selected_knowledge(monkeypatch) -> None
         log for log in live_logs if log["resource_id"] == completed["chat_id"]
     )
     assert live_trace["meta"]["knowledge_context_count"] == 2
+    assert live_trace["meta"]["provider_correlation_id"] == correlation_id
     assert {
         source["source_id"] for source in live_trace["meta"]["knowledge_sources"]
     } == source_ids

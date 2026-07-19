@@ -88,12 +88,17 @@ def _persist_attempts(
     workspace_id: str | None,
     correlation_id: str,
     attempts: list[ProviderAttempt],
+    *,
+    chat_id: str | None,
+    message_id: str | None,
 ) -> None:
     if workspace_id is None:
         return
     persist_gateway_attempt_records(
         workspace_id=workspace_id,
         correlation_id=correlation_id,
+        chat_id=chat_id,
+        message_id=message_id,
         attempts=[attempt.persisted_payload() for attempt in attempts],
     )
 
@@ -109,6 +114,8 @@ def execute_provider_plan(
     real_providers_enabled: bool = True,
     registry: ProviderRegistry | None = None,
     workspace_id: str | None = None,
+    chat_id: str | None = None,
+    message_id: str | None = None,
 ) -> GatewayExecution:
     if plan.strategy is not ExecutionStrategy.DIRECT_PROVIDER:
         raise ValueError("gateway direto recebeu plano de outra estratégia")
@@ -177,7 +184,13 @@ def execute_provider_plan(
                     latency_ms=int((perf_counter() - started_at) * 1000),
                 )
             )
-            _persist_attempts(workspace_id, correlation_id, attempts)
+            _persist_attempts(
+                workspace_id,
+                correlation_id,
+                attempts,
+                chat_id=chat_id,
+                message_id=message_id,
+            )
             return GatewayExecution(
                 result=result,
                 attempts=tuple(attempts),
@@ -186,7 +199,13 @@ def execute_provider_plan(
                 correlation_id=correlation_id,
             )
 
-    _persist_attempts(workspace_id, correlation_id, attempts)
+    _persist_attempts(
+        workspace_id,
+        correlation_id,
+        attempts,
+        chat_id=chat_id,
+        message_id=message_id,
+    )
     raise ProviderGatewayError(
         "nenhum provider do plano conseguiu executar a solicitação",
         tuple(attempts),

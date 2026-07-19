@@ -82,13 +82,25 @@ A API rejeita referência stale e impede que uma alteração deixe o workspace s
 GET /v1/model-providers/profiles?window_days=30
 GET /v1/model-providers/controls
 PUT /v1/model-providers/controls
+POST /v1/model-providers/attempts/retention/run
 ```
 
 A janela de telemetria aceita de 1 a 90 dias. A atualização de controle valida provider, modelo exato, autorização e cadeia resultante, persiste o estado e registra `model.control.update`.
 
+A operação de retenção exige owner/admin, usa `data_retention_days` do workspace, remove somente registros vencidos do tenant atual e registra `provider.attempt.retention`.
+
 ## tentativas e telemetria
 
 Cada execução recebe `correlation_id`. Sucessos, falhas e skips são persistidos em `provider_attempt_records` antes do retorno ou da falha terminal.
+
+Nos fluxos oficiais de chat:
+
+- tentativas nascem com workspace, chat e mensagem do usuário;
+- sucesso associa as tentativas ao model run e à mensagem de resposta;
+- falha terminal cria model run `failed` ligado à mensagem do usuário;
+- stop do live antes do primeiro delta cria model run `stopped`;
+- correlation id chega à metadata, auditoria e SSE seguro;
+- exclusão de chat remove tentativas correlacionadas antes das entidades referenciadas.
 
 A telemetria `model-telemetry-v1` registra:
 
@@ -100,6 +112,14 @@ A telemetria `model-telemetry-v1` registra:
 - última tentativa.
 
 Skips não entram no denominador de confiabilidade. Latência e confiabilidade vêm das tentativas; tokens e custo vêm de `ModelRun`. Custo desconhecido permanece `null`.
+
+## retenção e agregação
+
+- dados crus seguem `workspace_settings.data_retention_days`;
+- purge é isolado por workspace e auditado;
+- telemetria continua calculada sob demanda até 90 dias;
+- não há tabela de rollup nesta fase;
+- rollups, agregação materializada e circuit breaker ficam na fase 10 caso o volume prove necessidade.
 
 ## laboratório
 
@@ -118,21 +138,20 @@ Rotas:
 
 O payload e a interface não incluem segredo, hint de chave, ciphertext, URL de evidência, erro bruto, payload de provider, conteúdo de mensagem ou metadata reservada completa.
 
-## limites atuais
+## limites encaminhados
 
-Ainda faltam:
+Permanecem para fases posteriores:
 
 - política específica do endpoint NVIDIA hospedado;
 - metadados para modelos customizados e aliases não documentados;
 - qualidade por classe de tarefa;
-- retenção física e agregação histórica;
-- associação obrigatória entre tentativa, mensagem e model run;
 - revalidação transacional ao remover credenciais;
-- health score e circuit breaker;
-- uso da telemetria em scoring.
+- dataset e baseline;
+- hard gates, scoring e shadow mode;
+- health score, rollups e circuit breaker.
 
-## próxima fatia
+## fechamento
 
-A próxima fatia fecha a observabilidade da fase 4: associação obrigatória entre tentativa, mensagem e model run e decisão explícita sobre retenção/agregação. Itens próprios de saúde serão movidos para a fase 10 sem duplicação.
+O fechamento completo da fase 4, limites e rollback estão em `docs/phase-4-closure.md`.
 
-Nenhuma métrica entra no scoring antes do dataset e do baseline da fase 5.
+A próxima etapa é a fase 5: dataset versionado, replay offline e baseline reproduzível do `orbe-router-v1`.

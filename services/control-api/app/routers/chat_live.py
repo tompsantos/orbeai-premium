@@ -47,6 +47,11 @@ from app.services.orbe_router import (
     resolve_chat_route,
     resolve_legacy_chat_route,
 )
+from app.services.provider_execution_tracking import (
+    associate_successful_gateway_execution,
+    create_failed_gateway_model_run,
+    create_gateway_model_run_without_response,
+)
 from app.services.provider_gateway import (
     GatewayExecution,
     ProviderGatewayError,
@@ -224,24 +229,28 @@ def _prepare_live_turn(
         if message.role in {"user", "assistant", "system"}
     ]
 
-    resolver = resolve_chat_route if router_v1_enabled else resolve_legacy_chat_route
-    decision = resolver(
-        content=payload.content,
-        mode=chat.mode,
-        model_preference=chat.model_preference,
-        routing_mode="automático",
-        memory_context_count=len(relevant_memories) if router_v1_enabled else 0,
-        knowledge_context_count=len(knowledge_sources) if router_v1_enabled else 0,
-        cognition_enabled=settings.cognition_enabled,
-        real_providers_enabled=real_providers_enabled,
-    ) if router_v1_enabled else resolver(
-        content=payload.content,
-        mode=chat.mode,
-        model_preference=chat.model_preference,
-        routing_mode="automático",
-        cognition_enabled=settings.cognition_enabled,
-        real_providers_enabled=real_providers_enabled,
-    )
+    if router_v1_enabled:
+        decision = resolve_chat_route(
+            content=payload.content,
+            mode=chat.mode,
+            model_preference=chat.model_preference,
+            routing_mode="automático",
+            memory_context_count=len(relevant_memories),
+            knowledge_context_count=len(knowledge_sources),
+            cognition_enabled=settings.cognition_enabled,
+            real_providers_enabled=real_providers_enabled,
+            workspace_id=chat.workspace_id,
+        )
+    else:
+        decision = resolve_legacy_chat_route(
+            content=payload.content,
+            mode=chat.mode,
+            model_preference=chat.model_preference,
+            routing_mode="automático",
+            cognition_enabled=settings.cognition_enabled,
+            real_providers_enabled=real_providers_enabled,
+            workspace_id=chat.workspace_id,
+        )
 
     decision_payload = decision.persisted_payload()
     user_message.meta = {**(user_message.meta or {}), "router_decision": decision_payload}
@@ -310,6 +319,7 @@ def _finalize_live_turn(
     provider_error: str | None = None,
     cognition_error: str | None = None,
     provider_attempts: list[dict[str, object]] | None = None,
+    provider_correlation_id: str | None = None,
     used_provider_fallback: bool = False,
     used_cognition_fallback: bool = False,
 ) -> ChatSendResponse:
@@ -347,6 +357,7 @@ def _finalize_live_turn(
                 "router_selected_provider": result.provider_name,
                 "router_is_fallback": actual_fallback,
                 "provider_attempts": provider_attempts or [],
+                "provider_correlation_id": provider_correlation_id,
                 "runtime": runtime_name,
                 "run_status": run_status,
                 "latency_ms": latency_ms,
@@ -393,6 +404,14 @@ def _finalize_live_turn(
         )
         db.add(model_run)
         db.flush()
+        associated_attempt_count = associate_successful_gateway_execution(
+            db,
+            workspace_id=turn.workspace_id,
+            chat_id=turn.chat_id,
+            message_id=assistant_message.id,
+            model_run_id=model_run.id,
+            correlation_id=provider_correlation_id,
+        )
 
         write_audit_log(
             db=db,
@@ -411,6 +430,8 @@ def _finalize_live_turn(
                 "latency_ms": latency_ms,
                 "router_decision": decision_payload,
                 "provider_attempts": provider_attempts or [],
+                "provider_correlation_id": provider_correlation_id,
+                "associated_attempt_count": associated_attempt_count,
                 "memory_context_count": turn.memory_context_count,
                 "memory_event_count": len(turn.memory_events),
                 "knowledge_context_count": len(turn.knowledge_sources),
@@ -452,6 +473,111 @@ def _finalize_live_turn(
             assistant_message=assistant_message,
             memory_events=turn.memory_events,
         )
+    finally:
+        db.close()
+
+
+def _finalize_failed_provider_turn(
+    turn: LiveTurnContext,
+    error: ProviderGatewayError,
+) -> str:
+    db = SessionLocal()
+    try:
+        chat = db.get(Chat, turn.chat_id)
+        user_message = db.get(Message, turn.user_message_id)
+        if chat is None or user_message is None:
+            raise RuntimeError("turno vivo perdeu o contexto persistido")
+
+        model_run, associated_attempt_count = create_failed_gateway_model_run(
+            db,
+            workspace_id=turn.workspace_id,
+            chat_id=turn.chat_id,
+            message_id=turn.user_message_id,
+            task_type=f"chat.live.{turn.decision.execution_strategy.value}",
+            latency_ms=int((perf_counter() - turn.started_at) * 1000),
+            decision=turn.decision,
+            error=error,
+        )
+        user_message.meta = {
+            **(user_message.meta or {}),
+            "provider_correlation_id": error.correlation_id,
+            "model_run_id": model_run.id,
+            "run_status": "failed",
+        }
+        db.add(user_message)
+        write_audit_log(
+            db=db,
+            workspace_id=turn.workspace_id,
+            action="chat.live.failed",
+            resource_type="chat",
+            resource_id=turn.chat_id,
+            request_id=turn.request_id,
+            meta={
+                "message_id": turn.user_message_id,
+                "model_run_id": model_run.id,
+                "provider_correlation_id": error.correlation_id,
+                "attempt_count": len(error.attempts),
+                "associated_attempt_count": associated_attempt_count,
+                "router_decision": turn.decision.persisted_payload(),
+                "auth_user_id": turn.user_id,
+                "membership_role": turn.membership_role,
+            },
+        )
+        db.commit()
+        return model_run.id
+    finally:
+        db.close()
+
+
+def _finalize_stopped_provider_without_response(
+    turn: LiveTurnContext,
+    execution: GatewayExecution,
+) -> str:
+    db = SessionLocal()
+    try:
+        chat = db.get(Chat, turn.chat_id)
+        user_message = db.get(Message, turn.user_message_id)
+        if chat is None or user_message is None:
+            raise RuntimeError("turno vivo perdeu o contexto persistido")
+
+        model_run, associated_attempt_count = create_gateway_model_run_without_response(
+            db,
+            workspace_id=turn.workspace_id,
+            chat_id=turn.chat_id,
+            message_id=turn.user_message_id,
+            task_type=f"chat.live.{turn.decision.execution_strategy.value}",
+            status="stopped",
+            latency_ms=int((perf_counter() - turn.started_at) * 1000),
+            decision=turn.decision,
+            execution=execution,
+            error_message="stream_stopped_before_first_delta",
+        )
+        user_message.meta = {
+            **(user_message.meta or {}),
+            "provider_correlation_id": execution.correlation_id,
+            "model_run_id": model_run.id,
+            "run_status": "stopped",
+        }
+        db.add(user_message)
+        write_audit_log(
+            db=db,
+            workspace_id=turn.workspace_id,
+            action="chat.live.stopped",
+            resource_type="chat",
+            resource_id=turn.chat_id,
+            request_id=turn.request_id,
+            meta={
+                "message_id": turn.user_message_id,
+                "model_run_id": model_run.id,
+                "provider_correlation_id": execution.correlation_id,
+                "attempt_count": len(execution.attempts),
+                "associated_attempt_count": associated_attempt_count,
+                "auth_user_id": turn.user_id,
+                "membership_role": turn.membership_role,
+            },
+        )
+        db.commit()
+        return model_run.id
     finally:
         db.close()
 
@@ -508,6 +634,9 @@ def _execute_direct(turn: LiveTurnContext) -> GatewayExecution:
         memory_context=turn.memory_context,
         knowledge_context=turn.knowledge_context,
         real_providers_enabled=turn.real_providers_enabled,
+        workspace_id=turn.workspace_id,
+        chat_id=turn.chat_id,
+        message_id=turn.user_message_id,
     )
 
 
@@ -532,6 +661,7 @@ def _stream_direct_execution(
 
     for chunk in _text_chunks(result.content):
         if live_run_stop_requested(turn.request_id):
+            model_run_id: str | None = None
             if streamed.strip():
                 stopped_result = ProviderExecutionResult(
                     content=streamed.strip(),
@@ -550,16 +680,21 @@ def _stream_direct_execution(
                     provider_error=provider_error,
                     cognition_error=cognition_error,
                     provider_attempts=attempts,
+                    provider_correlation_id=execution.correlation_id,
                     used_provider_fallback=execution.used_fallback,
                     used_cognition_fallback=used_cognition_fallback,
                 ).model_dump(mode="json")
+                model_run_id = str(response_data.get("model_run_id") or "") or None
             else:
                 response_data = None
+                model_run_id = _finalize_stopped_provider_without_response(turn, execution)
             yield _sse(
                 "response.stopped",
                 request_id=turn.request_id,
                 chat_id=turn.chat_id,
                 partial_response=streamed.strip(),
+                provider_correlation_id=execution.correlation_id,
+                model_run_id=model_run_id,
                 response=response_data,
             )
             return
@@ -579,6 +714,7 @@ def _stream_direct_execution(
         provider_error=provider_error,
         cognition_error=cognition_error,
         provider_attempts=attempts,
+        provider_correlation_id=execution.correlation_id,
         used_provider_fallback=execution.used_fallback,
         used_cognition_fallback=used_cognition_fallback,
     )
@@ -586,6 +722,7 @@ def _stream_direct_execution(
         "response.completed",
         request_id=turn.request_id,
         chat_id=turn.chat_id,
+        provider_correlation_id=execution.correlation_id,
         response=response.model_dump(mode="json"),
     )
 
@@ -748,12 +885,15 @@ def _stream_live_turn(turn: LiveTurnContext) -> Iterator[str]:
         execution = _execute_direct(turn)
         yield from _stream_direct_execution(turn, execution)
     except ProviderGatewayError as exc:
+        model_run_id = _finalize_failed_provider_turn(turn, exc)
         yield _sse(
             "response.failed",
             request_id=turn.request_id,
             chat_id=turn.chat_id,
-            error=str(exc),
+            error="nenhum provider disponível conseguiu concluir a solicitação",
             provider_attempts=[attempt.persisted_payload() for attempt in exc.attempts],
+            provider_correlation_id=exc.correlation_id,
+            model_run_id=model_run_id,
             response=None,
         )
     finally:

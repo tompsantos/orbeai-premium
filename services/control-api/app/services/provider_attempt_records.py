@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
+from datetime import datetime, timedelta
 
+from sqlalchemy import delete, update
 from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
 from app.models import ProviderAttemptRecord
+from app.models.core import utc_now
 
 
 def _optional_text(value: object, max_length: int) -> str | None:
@@ -59,16 +62,60 @@ def persist_gateway_attempt_records(
     workspace_id: str,
     correlation_id: str,
     attempts: Iterable[Mapping[str, object]],
+    chat_id: str | None = None,
+    message_id: str | None = None,
 ) -> list[ProviderAttemptRecord]:
     with SessionLocal() as db:
         records = persist_provider_attempt_records(
             db,
             workspace_id=workspace_id,
-            chat_id=None,
+            chat_id=chat_id,
             request_id=correlation_id,
+            message_id=message_id,
             attempts=attempts,
         )
         db.commit()
         for record in records:
             db.refresh(record)
         return records
+
+
+def associate_gateway_attempt_records(
+    db: Session,
+    *,
+    workspace_id: str,
+    correlation_id: str | None,
+    chat_id: str,
+    message_id: str,
+    model_run_id: str,
+) -> int:
+    if not correlation_id:
+        return 0
+
+    result = db.execute(
+        update(ProviderAttemptRecord)
+        .where(ProviderAttemptRecord.workspace_id == workspace_id)
+        .where(ProviderAttemptRecord.request_id == correlation_id)
+        .values(
+            chat_id=chat_id,
+            message_id=message_id,
+            model_run_id=model_run_id,
+        )
+    )
+    return int(result.rowcount or 0)
+
+
+def purge_expired_provider_attempt_records(
+    db: Session,
+    *,
+    workspace_id: str,
+    retention_days: int,
+    now: datetime | None = None,
+) -> int:
+    cutoff = (now or utc_now()) - timedelta(days=max(1, int(retention_days)))
+    result = db.execute(
+        delete(ProviderAttemptRecord)
+        .where(ProviderAttemptRecord.workspace_id == workspace_id)
+        .where(ProviderAttemptRecord.created_at < cutoff)
+    )
+    return int(result.rowcount or 0)
