@@ -35,14 +35,14 @@ def test_model_profiles_endpoint_is_disabled_by_default() -> None:
     assert response.json() == {"detail": "Model profiles are disabled"}
 
 
-def test_model_profiles_endpoint_exposes_only_registered_models(monkeypatch) -> None:
+def test_model_profiles_endpoint_exposes_registered_models_and_telemetry(monkeypatch) -> None:
     monkeypatch.setattr(
         model_providers_router,
         "is_feature_enabled",
         lambda **kwargs: kwargs["key"] in {"router_model_profiles", "real_providers"},
     )
 
-    response = client.get("/v1/model-providers/profiles")
+    response = client.get("/v1/model-providers/profiles?window_days=7")
 
     assert response.status_code == 200
     profiles = response.json()
@@ -56,3 +56,18 @@ def test_model_profiles_endpoint_exposes_only_registered_models(monkeypatch) -> 
     assert all(profile["data_policy"] == "not_validated" for profile in profiles)
     assert all("key_hint" not in profile for profile in profiles)
     assert all("credential_source" not in profile for profile in profiles)
+    assert all(profile["telemetry"]["telemetry_version"] == "model-telemetry-v1" for profile in profiles)
+    assert all(profile["telemetry"]["window_days"] == 7 for profile in profiles)
+    assert all(profile["telemetry"]["attempt_sample_count"] >= 0 for profile in profiles)
+
+
+def test_model_profiles_rejects_telemetry_window_outside_limit(monkeypatch) -> None:
+    monkeypatch.setattr(
+        model_providers_router,
+        "is_feature_enabled",
+        lambda **kwargs: kwargs["key"] in {"router_model_profiles", "real_providers"},
+    )
+
+    response = client.get("/v1/model-providers/profiles?window_days=91")
+
+    assert response.status_code == 422
