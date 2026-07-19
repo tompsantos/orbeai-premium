@@ -12,9 +12,9 @@ Legenda: `[x]` comprovado, `[ ]` pendente. Código, CI e ambiente devem ser trat
 - kernel: `orbe-router-v1`;
 - fase 2: desenvolvimento concluído, rollout da center pendente;
 - fase 3: concluída;
-- fase 4: concluída no PR #33;
-- fase 5: gate quantitativo implementado; bancada sintética pronta e transição bloqueada pela ausência de casos reais revisados;
-- blocker oficial: `real_dataset_missing`;
+- fase 4: concluída;
+- fase 5: desenvolvimento sintético concluído;
+- gate da fase 5: `blocked` apenas por `real_dataset_missing`;
 - próximo marco: executar a quarentena em ambiente autorizado e promover 12 casos reais revisados.
 
 ## fase 0. fundação arquitetural
@@ -95,8 +95,7 @@ status: concluída.
 - [x] p50, p95, sucesso, timeout, tokens e custo comprovável;
 - [x] tentativas ligadas a chat, mensagem e model run;
 - [x] model run para falha terminal e stop antes do primeiro delta;
-- [x] retenção física pelo workspace;
-- [x] purge isolado e auditado;
+- [x] retenção física e purge auditado por workspace;
 - [x] agregação sob demanda até 90 dias;
 - [x] rollups e circuit breaker encaminhados para a fase 10.
 
@@ -109,13 +108,11 @@ status: concluída.
 - [x] controles locais e decisão simulada removidos;
 - [x] nenhum segredo ou payload bruto exposto.
 
-critério de saída: cumprido.
-
 fechamento: `docs/phase-4-closure.md`.
 
 ## fase 5. dataset e baseline
 
-status: desenvolvimento sintético concluído; gate bloqueado por requisito operacional.
+status: desenvolvimento sintético concluído; requisito operacional pendente.
 
 ### 5a. contrato e baseline funcional
 
@@ -126,7 +123,6 @@ status: desenvolvimento sintético concluído; gate bloqueado por requisito oper
 - [x] providers, reason codes, capabilities, fallback e classificação;
 - [x] ambiente sintético sem credencial ou chamada externa;
 - [x] replay `router-replay-v1` usando o kernel real;
-- [x] comando reproduzível e código de saída para CI;
 - [x] 28 casos em 17 categorias;
 - [x] `router-baseline-v1`;
 - [x] 28 de 28 casos aprovados na CI.
@@ -163,31 +159,26 @@ Classes críticas:
 - [x] limites 900/901 e 2.500/2.501;
 - [x] dois versus três sinais semânticos;
 - [x] precedência de escolha manual, modo e intenção;
-- [x] pesquisa combinada com documento, código e risco;
 - [x] memória, conhecimento e contexto combinado;
 - [x] cognition ativo, desativado e com provider indisponível;
 - [x] ambiguidades explícitas, negadas e explicativas de ferramenta;
 - [x] 20 casos em 8 categorias;
 - [x] `router-boundary-baseline-v1`;
 - [x] 20 de 20 casos aprovados na CI;
-- [x] cli `python scripts/router_replay.py --kind boundaries`;
 - [x] comportamento ambíguo documentado sem ser declarado correto.
 
 ### 5d. direto versus cognition
 
 - [x] contrato `router-execution-pair-v1`;
 - [x] variantes explicativa e operacional por par;
-- [x] materialização no contrato funcional existente;
 - [x] 10 pares e 20 casos em 5 categorias;
 - [x] criação de arquivo, pesquisa web, código e documento;
 - [x] comprimento, múltiplos passos e contexto;
 - [x] termos GitHub, terminal e deploy;
 - [x] `router-execution-pair-baseline-v1`;
-- [x] cli `python scripts/router_replay.py --kind execution`;
 - [x] 10 de 10 pares e 20 de 20 casos aprovados na CI;
 - [x] 7 pares separados entre direto e cognition;
-- [x] 3 pares `both_cognition` registrados como sobreacionamento;
-- [x] sobreacionamentos documentados sem alteração prematura do kernel.
+- [x] 3 pares `both_cognition` registrados como sobreacionamento.
 
 ### 5e. gate quantitativo de saída
 
@@ -196,13 +187,25 @@ Classes críticas:
 - [x] mínimos por camada e categoria versionados;
 - [x] 10 pares e pelo menos 7 separações exigidos;
 - [x] achados conhecidos protegidos contra mudança silenciosa;
-- [x] requisito de 12 casos reais definido;
-- [x] duas amostras por classe crítica exigidas;
+- [x] requisito de 12 casos reais e duas amostras por classe definido;
 - [x] modo de auditoria não bloqueia CI saudável;
 - [x] `--require-ready` bloqueia transição incompleta com código 2;
 - [x] estado atual comprovado como `blocked`;
 - [x] blocker atual reduzido a `real_dataset_missing`;
 - [x] fixture completa comprovada como `ready`.
+
+### 5f. comparação offline de candidatos
+
+- [x] contrato `router-offline-comparison-v1`;
+- [x] compatibilidade por versão, dataset, hash e conjunto de casos;
+- [x] suporte a relatórios funcionais, de fronteira e pareados;
+- [x] casos e pares classificados como inalterados, alterados, recuperados ou regredidos;
+- [x] delta de distribuição por rota, estratégia e provider;
+- [x] relatório idêntico classificado como `approved`;
+- [x] mudança dentro do contrato classificada como `review_required`;
+- [x] regressão ou incompatibilidade classificada como `blocked`;
+- [x] códigos de saída 0, 1 e 2;
+- [x] nenhuma ativação ou chamada externa durante a comparação.
 
 ### saída da fase 5
 
@@ -210,14 +213,15 @@ Classes críticas:
 - [x] definir limiar mínimo por camada e categoria;
 - [x] definir regressões sintéticas proibidas;
 - [x] aprovar critério quantitativo de saída;
+- [x] definir como candidatos futuros serão comparados offline;
 - [ ] incluir 12 casos reais revisados nas classes críticas;
-- [ ] executar `python scripts/router_evaluation_gate.py --require-ready` com código zero;
-- [ ] definir como candidatos futuros serão comparados offline.
+- [ ] executar `python scripts/router_evaluation_gate.py --require-ready` com código zero.
 
 Documentação:
 
 - `docs/router-evaluation.md`;
 - `docs/router-evaluation-exit-gate.md`;
+- `docs/router-offline-comparison.md`;
 - documento da quarentena de casos reais.
 
 ## fase 6. políticas e hard gates
@@ -328,4 +332,5 @@ status: não iniciada.
 - PR #35: quarentena segura para casos reais;
 - PR #36: dataset e baseline de fronteiras e ambiguidades;
 - PR #37: pares direto versus cognition e sobreacionamentos medidos;
-- PR #38: gate quantitativo e blocker explícito da fase 5.
+- PR #38: gate quantitativo e blocker explícito da fase 5;
+- PR #39: comparação offline de candidatos.
