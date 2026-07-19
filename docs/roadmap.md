@@ -26,7 +26,7 @@ status: concluída o suficiente para avançar.
 
 ## era 2 - orbeRouter
 
-status: primeira vitória real concluída; evolução orientada por evidência em construção.
+status: primeira vitória real e fase de perfis/observabilidade concluídas; dataset e baseline são o próximo marco.
 
 objetivo: tornar o orbeRouter o córtex executivo da orbeAI. ele decide a estratégia de execução; o Hermes, dentro do `orbe cognition core`, executa loops cognitivos somente quando escolhido.
 
@@ -60,6 +60,8 @@ objetivo: tornar o orbeRouter o córtex executivo da orbeAI. ele decide a estrat
 - [x] emitir `router.decision` no SSE;
 - [x] escolher execução direta ou cognition;
 - [x] persistir provider, modelo, tentativas, fallback, latência e model run;
+- [x] correlacionar tentativas com chat, mensagem e model run;
+- [x] criar model run para falha terminal e stop antes do primeiro delta;
 - [x] manter o frontend no mesmo fluxo vivo;
 - [x] provar em ambiente integrado respostas de providers reais enviadas pela interface;
 - [ ] registrar evidência técnica do teste real com ids sanitizados.
@@ -92,8 +94,9 @@ critério da primeira vitória: cumprido no ambiente integrado. falta consolidar
 - [x] expor telemetria e controles seguros no Laboratório;
 - [x] validar contexto e política de dados por id exato quando houver fonte oficial;
 - [x] manter modelos e campos desconhecidos como `not_validated`;
-- [ ] associar obrigatoriamente tentativa, mensagem e model run;
-- [ ] definir retenção e agregação da telemetria;
+- [x] associar tentativas de chat a mensagem e model run;
+- [x] usar retenção do workspace e purge auditado;
+- [x] manter agregação sob demanda até 90 dias;
 - [ ] criar dataset versionado de decisões;
 - [ ] criar replay offline;
 - [ ] medir baseline do router v1.
@@ -117,6 +120,7 @@ critério da primeira vitória: cumprido no ambiente integrado. falta consolidar
 
 ### bloco 2i - saúde, avaliação e rollout
 
+- [ ] avaliar rollups históricos com volume real;
 - [ ] circuit breaker;
 - [ ] métricas de decisão e execução;
 - [ ] explicabilidade segura;
