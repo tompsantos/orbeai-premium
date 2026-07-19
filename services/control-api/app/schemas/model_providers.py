@@ -79,3 +79,10 @@ class WorkspaceModelControlRead(BaseModel):
     executable: bool
     updated_at: str | None = None
     updated_by: str | None = None
+
+
+class ProviderAttemptRetentionRead(BaseModel):
+    retention_days: int
+    deleted_records: int
+    aggregation_mode: str
+    max_query_window_days: int
