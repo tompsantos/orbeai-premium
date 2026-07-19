@@ -26,7 +26,7 @@ status: concluída o suficiente para avançar.
 
 ## era 2 - orbeRouter
 
-status: primeira vitória real e fase de perfis/observabilidade concluídas; dataset e baseline são o próximo marco.
+status: primeira vitória real e observabilidade concluídas; baseline sintético v1 validado, casos reais sanitizados são o próximo marco.
 
 objetivo: tornar o orbeRouter o córtex executivo da orbeAI. ele decide a estratégia de execução; o Hermes, dentro do `orbe cognition core`, executa loops cognitivos somente quando escolhido.
 
@@ -75,7 +75,8 @@ critério da primeira vitória: cumprido no ambiente integrado. falta consolidar
 - [x] interrupção, aprovação e isolamento multi-tenant são preservados;
 - [ ] selecionar modelo cognitivo por contrato explícito;
 - [ ] declarar capacidades de ferramentas autorizadas no plano;
-- [ ] criar dataset de decisão direta versus cognitiva.
+- [x] criar dataset sintético direto versus cognition;
+- [ ] adicionar casos reais sanitizados direto versus cognition.
 
 ### bloco 2e - segurança e fechamento operacional
 
@@ -97,9 +98,12 @@ critério da primeira vitória: cumprido no ambiente integrado. falta consolidar
 - [x] associar tentativas de chat a mensagem e model run;
 - [x] usar retenção do workspace e purge auditado;
 - [x] manter agregação sob demanda até 90 dias;
-- [ ] criar dataset versionado de decisões;
-- [ ] criar replay offline;
-- [ ] medir baseline do router v1.
+- [x] criar dataset sintético versionado com 28 casos;
+- [x] criar replay offline sem provider, credencial ou custo;
+- [x] medir baseline sintético reproduzível do router v1;
+- [ ] adicionar casos reais sanitizados;
+- [ ] ampliar entradas longas e fronteiras ambíguas;
+- [ ] definir critério quantitativo de saída da fase 5.
 
 ### bloco 2g - políticas e scoring v2
 
