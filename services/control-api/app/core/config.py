@@ -29,6 +29,10 @@ class Settings(BaseSettings):
 
     jwt_secret: str = Field(default="dev-only-change-me", validation_alias="JWT_SECRET")
     jwt_algorithm: str = "HS256"
+    public_registration_enabled: bool = Field(
+        default=False,
+        validation_alias="PUBLIC_REGISTRATION_ENABLED",
+    )
 
     openai_api_key: str | None = Field(default=None, validation_alias="OPENAI_API_KEY")
     anthropic_api_key: str | None = Field(default=None, validation_alias="ANTHROPIC_API_KEY")
