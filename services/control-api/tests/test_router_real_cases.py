@@ -29,6 +29,7 @@ def _decision(
     primary: str = "openai",
     is_fallback: bool = False,
 ) -> dict:
+    chain = [provider, "mock"] if is_fallback else [provider, "gemini", "mock"]
     return {
         "router_version": "orbe-router-v1",
         "route_kind": "direct_model",
@@ -43,7 +44,7 @@ def _decision(
             "routing_policy",
             "provider_fallback" if is_fallback else "provider_configured",
         ],
-        "fallback_chain": [provider, "mock"] if is_fallback else [provider, "gemini", "mock"],
+        "fallback_chain": chain,
         "routing_mode": "automático",
         "estimated_latency_ms": None,
         "estimated_cost_usd": None,
@@ -67,7 +68,7 @@ def _decision(
             "strategy": "direct_provider",
             "route_kind": "direct_model",
             "primary_provider_slug": primary,
-            "provider_chain": [provider, "mock"] if is_fallback else [provider, "gemini", "mock"],
+            "provider_chain": chain,
             "model_by_provider": {},
             "capability_ids": ["direct_text_response"],
             "timeout_seconds": 15.0,
@@ -106,9 +107,18 @@ def _source_objects(content: str = "conteúdo real que não pode sair") -> tuple
     return audit, message, chat
 
 
+def _candidate(content: str = "conteúdo real que não pode sair"):
+    audit, message, chat = _source_objects(content)
+    return build_real_case_candidate(
+        audit=audit,
+        message=message,
+        chat=chat,
+        export_secret=EXPORT_SECRET,
+    )
+
+
 def test_candidate_contains_no_raw_content_or_raw_identifiers() -> None:
     audit, message, chat = _source_objects()
-
     candidate = build_real_case_candidate(
         audit=audit,
         message=message,
@@ -129,20 +139,9 @@ def test_candidate_contains_no_raw_content_or_raw_identifiers() -> None:
 
 
 def test_candidate_identity_is_stable_per_secret_and_changes_with_secret() -> None:
+    first = _candidate()
+    repeated = _candidate()
     audit, message, chat = _source_objects()
-
-    first = build_real_case_candidate(
-        audit=audit,
-        message=message,
-        chat=chat,
-        export_secret=EXPORT_SECRET,
-    )
-    repeated = build_real_case_candidate(
-        audit=audit,
-        message=message,
-        chat=chat,
-        export_secret=EXPORT_SECRET,
-    )
     other_secret = build_real_case_candidate(
         audit=audit,
         message=message,
@@ -158,12 +157,7 @@ def test_candidate_identity_is_stable_per_secret_and_changes_with_secret() -> No
 
 def test_extractor_isolates_workspace_and_deduplicates_message() -> None:
     suffix = uuid4().hex[:10]
-    target_workspace_id: str | None = None
-    other_workspace_id: str | None = None
-    target_chat_id: str | None = None
-    other_chat_id: str | None = None
-    target_message_id: str | None = None
-    other_message_id: str | None = None
+    ids: dict[str, str] = {}
 
     with SessionLocal() as db:
         target = Workspace(name="Target Real Cases", slug=f"target-real-cases-{suffix}")
@@ -177,7 +171,7 @@ def test_extractor_isolates_workspace_and_deduplicates_message() -> None:
         target_message = Message(
             chat_id=target_chat.id,
             role="user",
-            content="pedido real do workspace alvo",
+            content="pedido real do workspace alvo aqui",
             meta={"mode": "strategist", "model_preference": "auto"},
         )
         other_message = Message(
@@ -214,43 +208,53 @@ def test_extractor_isolates_workspace_and_deduplicates_message() -> None:
             ]
         )
         db.commit()
-        target_workspace_id = target.id
-        other_workspace_id = other.id
-        target_chat_id = target_chat.id
-        other_chat_id = other_chat.id
-        target_message_id = target_message.id
-        other_message_id = other_message.id
+        ids = {
+            "target_workspace": target.id,
+            "other_workspace": other.id,
+            "target_chat": target_chat.id,
+            "other_chat": other_chat.id,
+            "target_message": target_message.id,
+            "other_message": other_message.id,
+        }
 
     try:
         with SessionLocal() as db:
             candidates = extract_real_case_candidates(
                 db,
-                workspace_id=str(target_workspace_id),
+                workspace_id=ids["target_workspace"],
                 export_secret=EXPORT_SECRET,
             )
         assert len(candidates) == 1
         assert candidates[0].content_metrics.word_count == 6
     finally:
         with SessionLocal() as db:
-            db.execute(delete(AuditLog).where(AuditLog.workspace_id.in_([target_workspace_id, other_workspace_id])))
-            db.execute(delete(Message).where(Message.id.in_([target_message_id, other_message_id])))
-            db.execute(delete(Chat).where(Chat.id.in_([target_chat_id, other_chat_id])))
-            db.execute(delete(Workspace).where(Workspace.id.in_([target_workspace_id, other_workspace_id])))
+            db.execute(
+                delete(AuditLog).where(
+                    AuditLog.workspace_id.in_(
+                        [ids["target_workspace"], ids["other_workspace"]]
+                    )
+                )
+            )
+            db.execute(
+                delete(Message).where(
+                    Message.id.in_([ids["target_message"], ids["other_message"]])
+                )
+            )
+            db.execute(
+                delete(Chat).where(Chat.id.in_([ids["target_chat"], ids["other_chat"]]))
+            )
+            db.execute(
+                delete(Workspace).where(
+                    Workspace.id.in_([ids["target_workspace"], ids["other_workspace"]])
+                )
+            )
             db.commit()
 
 
 def test_review_template_starts_rejected() -> None:
-    audit, message, chat = _source_objects()
-    candidate = build_real_case_candidate(
-        audit=audit,
-        message=message,
-        chat=chat,
-        export_secret=EXPORT_SECRET,
-    )
+    candidate = _candidate()
 
-    template = review_template([candidate])
-
-    assert template == [
+    assert review_template([candidate]) == [
         {
             "review_version": REAL_CASE_REVIEW_VERSION,
             "candidate_id": candidate.candidate_id,
@@ -265,14 +269,7 @@ def test_review_template_starts_rejected() -> None:
 
 
 def test_promotion_requires_real_sanitization_and_emits_router_case_v1() -> None:
-    raw_content = "avalie o contrato confidencial do cliente alpha"
-    audit, message, chat = _source_objects(raw_content)
-    candidate = build_real_case_candidate(
-        audit=audit,
-        message=message,
-        chat=chat,
-        export_secret=EXPORT_SECRET,
-    )
+    candidate = _candidate("avalie o contrato confidencial do cliente alpha")
     review = RouterRealCaseReview(
         review_version=REAL_CASE_REVIEW_VERSION,
         candidate_id=candidate.candidate_id,
@@ -298,13 +295,7 @@ def test_promotion_requires_real_sanitization_and_emits_router_case_v1() -> None
 
 def test_promotion_rejects_unchanged_raw_content() -> None:
     raw_content = "avalie um contrato sem qualquer identificador"
-    audit, message, chat = _source_objects(raw_content)
-    candidate = build_real_case_candidate(
-        audit=audit,
-        message=message,
-        chat=chat,
-        export_secret=EXPORT_SECRET,
-    )
+    candidate = _candidate(raw_content)
     review = RouterRealCaseReview(
         review_version=REAL_CASE_REVIEW_VERSION,
         candidate_id=candidate.candidate_id,
