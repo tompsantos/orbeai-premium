@@ -29,6 +29,48 @@ def associate_successful_gateway_execution(
     )
 
 
+def create_gateway_model_run_without_response(
+    db: Session,
+    *,
+    workspace_id: str,
+    chat_id: str,
+    message_id: str,
+    task_type: str,
+    status: str,
+    latency_ms: int,
+    decision: RouterDecision,
+    execution: GatewayExecution,
+    error_message: str | None = None,
+) -> tuple[ModelRun, int]:
+    model_run = ModelRun(
+        workspace_id=workspace_id,
+        chat_id=chat_id,
+        message_id=message_id,
+        provider_name=execution.result.provider_name,
+        model_name=execution.result.model_name,
+        task_type=task_type,
+        status=status,
+        latency_ms=max(0, latency_ms),
+        input_tokens=execution.result.input_tokens,
+        output_tokens=0,
+        estimated_cost_usd=execution.result.estimated_cost_usd,
+        router_reason=decision.reason,
+        fallback_chain=decision.fallback_chain,
+        error_message=error_message,
+    )
+    db.add(model_run)
+    db.flush()
+    associated_count = associate_gateway_attempt_records(
+        db,
+        workspace_id=workspace_id,
+        correlation_id=execution.correlation_id,
+        chat_id=chat_id,
+        message_id=message_id,
+        model_run_id=model_run.id,
+    )
+    return model_run, associated_count
+
+
 def create_failed_gateway_model_run(
     db: Session,
     *,
