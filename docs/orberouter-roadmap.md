@@ -13,8 +13,9 @@ Legenda: `[x]` comprovado, `[ ]` pendente. Código, CI e ambiente devem ser trat
 - fase 2: desenvolvimento concluído, rollout da center pendente;
 - fase 3: concluída;
 - fase 4: concluída no PR #33;
-- fase 5: em andamento com três baselines sintéticos e quarentena de casos reais;
-- próximo marco: definir critérios quantitativos de saída e promover casos reais revisados.
+- fase 5: gate quantitativo implementado; bancada sintética pronta e transição bloqueada pela ausência de casos reais revisados;
+- blocker oficial: `real_dataset_missing`;
+- próximo marco: executar a quarentena em ambiente autorizado e promover 12 casos reais revisados.
 
 ## fase 0. fundação arquitetural
 
@@ -114,7 +115,7 @@ fechamento: `docs/phase-4-closure.md`.
 
 ## fase 5. dataset e baseline
 
-status: em andamento.
+status: desenvolvimento sintético concluído; gate bloqueado por requisito operacional.
 
 ### 5a. contrato e baseline funcional
 
@@ -137,13 +138,23 @@ status: em andamento.
 - [x] ids substituídos por HMAC;
 - [x] nenhum conteúdo bruto no candidato;
 - [x] template de revisão nasce rejeitado;
-- [x] scanner de PII, infraestrutura e segredo;
+- [x] scanner de dados sensíveis;
 - [x] promoção gera somente `router-case-v1` revisado;
 - [x] candidatos e revisões fora do repositório por padrão;
 - [x] pipeline e quarentena validados no PR #35;
 - [ ] executar exportação em ambiente autorizado;
 - [ ] revisar paráfrases sanitizadas;
-- [ ] promover os primeiros casos reais para o dataset versionado.
+- [ ] promover 12 casos reais para o dataset versionado;
+- [ ] cobrir duas amostras em cada classe crítica.
+
+Classes críticas:
+
+- `conversation`;
+- `software`;
+- `document`;
+- `research`;
+- `risk-sensitivity`;
+- `execution-boundary`.
 
 ### 5c. fronteiras e ambiguidades
 
@@ -178,19 +189,40 @@ status: em andamento.
 - [x] 3 pares `both_cognition` registrados como sobreacionamento;
 - [x] sobreacionamentos documentados sem alteração prematura do kernel.
 
+### 5e. gate quantitativo de saída
+
+- [x] política `router-evaluation-exit-gate-v1`;
+- [x] 68 casos sintéticos exigidos sem falha;
+- [x] mínimos por camada e categoria versionados;
+- [x] 10 pares e pelo menos 7 separações exigidos;
+- [x] achados conhecidos protegidos contra mudança silenciosa;
+- [x] requisito de 12 casos reais definido;
+- [x] duas amostras por classe crítica exigidas;
+- [x] modo de auditoria não bloqueia CI saudável;
+- [x] `--require-ready` bloqueia transição incompleta com código 2;
+- [x] estado atual comprovado como `blocked`;
+- [x] blocker atual reduzido a `real_dataset_missing`;
+- [x] fixture completa comprovada como `ready`.
+
 ### saída da fase 5
 
 - [x] ampliar casos direto versus cognition;
-- [ ] incluir casos reais revisados suficientes para as classes críticas;
-- [ ] definir limiar mínimo por categoria e regressões proibidas;
-- [ ] definir como candidatos futuros serão comparados offline;
-- [ ] aprovar critério quantitativo de saída antes da fase 6.
+- [x] definir limiar mínimo por camada e categoria;
+- [x] definir regressões sintéticas proibidas;
+- [x] aprovar critério quantitativo de saída;
+- [ ] incluir 12 casos reais revisados nas classes críticas;
+- [ ] executar `python scripts/router_evaluation_gate.py --require-ready` com código zero;
+- [ ] definir como candidatos futuros serão comparados offline.
 
-Documentação: `docs/router-evaluation.md` e `docs/router-real-case-quarantine.md`.
+Documentação:
+
+- `docs/router-evaluation.md`;
+- `docs/router-evaluation-exit-gate.md`;
+- documento da quarentena de casos reais.
 
 ## fase 6. políticas e hard gates
 
-status: não iniciada.
+status: bloqueada pelo gate da fase 5.
 
 - [ ] providers e modelos permitidos por workspace;
 - [ ] classes de dados e privacidade;
@@ -295,4 +327,5 @@ status: não iniciada.
 - PR #34: dataset sintético, replay offline e baseline funcional v1;
 - PR #35: quarentena segura para casos reais;
 - PR #36: dataset e baseline de fronteiras e ambiguidades;
-- PR #37: pares direto versus cognition e sobreacionamentos medidos.
+- PR #37: pares direto versus cognition e sobreacionamentos medidos;
+- PR #38: gate quantitativo e blocker explícito da fase 5.
