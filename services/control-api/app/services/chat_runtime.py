@@ -25,6 +25,7 @@ class ChatRuntimeExecution:
     used_legacy_fallback: bool
     knowledge_sources: list[KnowledgeContextSource]
     provider_attempts: list[dict[str, object]]
+    provider_correlation_id: str | None
 
 
 def _direct_plan(decision: RouterDecision) -> ExecutionPlan:
@@ -61,6 +62,7 @@ def execute_chat_runtime(
     workspace_id: str,
     user_id: str,
     chat_id: str,
+    user_message_id: str,
     content: str,
     mode: str,
     model_preference: str,
@@ -101,6 +103,7 @@ def execute_chat_runtime(
                 used_legacy_fallback=False,
                 knowledge_sources=knowledge_sources,
                 provider_attempts=[],
+                provider_correlation_id=None,
             )
         except Exception as exc:
             cognition_error = f"{type(exc).__name__}: {exc}"
@@ -116,6 +119,8 @@ def execute_chat_runtime(
         knowledge_context=knowledge_context,
         real_providers_enabled=real_providers_enabled,
         workspace_id=workspace_id,
+        chat_id=chat_id,
+        message_id=user_message_id,
     )
     provider_error = _provider_error(execution)
     router_reason = decision.reason
@@ -135,4 +140,5 @@ def execute_chat_runtime(
         used_legacy_fallback=bool(cognition_error),
         knowledge_sources=knowledge_sources,
         provider_attempts=execution.attempts_payload(),
+        provider_correlation_id=execution.correlation_id,
     )
